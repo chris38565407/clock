@@ -15,7 +15,7 @@
   <div class="card">
     <h2>第一次使用，請先註冊</h2>
     <label>姓名（請填真實姓名）</label><input id="r-name" maxlength="30">
-    <label>部門（可不填）</label><input id="r-dept" maxlength="30">
+    <label>部門</label><select id="r-dept"></select>
     <p></p><div class="row"><button class="btn" onclick="register()">送出註冊</button></div>
   </div>
 </main></div>
@@ -93,7 +93,11 @@ async function start() {
 }
 function render() {
   $('company').textContent = me.company;
-  if (!me.registered) { $('r-name').value = ''; view('reg'); return; }
+  if (!me.registered) {
+    $('r-name').value = '';
+    $('r-dept').innerHTML = '<option value="">請選擇部門</option>' + me.depts.map((d) => '<option>' + esc(d) + '</option>').join('');
+    view('reg'); return;
+  }
   $('who').textContent = me.name + (me.dept ? '・' + me.dept : '');
   if (me.status === '待審核') { message('註冊已送出，請等待管理員核准後再開啟此頁面。'); return; }
   if (me.status !== '在職') { message('您的帳號目前為「' + esc(me.status) + '」，無法打卡。'); return; }
@@ -179,7 +183,7 @@ async function loadApps() {
     $('a-list').innerHTML = list.map((a) => {
       const cls = { '待審核': 'warn', '已核准': 'ok', '已駁回': 'bad' }[a.status] || '';
       return '<div class="item"><span class="tag ' + cls + '">' + esc(a.status) + '</span><b>' + esc(a.kind) + (a.sub ? '・' + esc(a.sub) : '') + '</b><br>' +
-        '<span class="mute">' + esc(a.start) + (a.end ? ' ~ ' + esc(a.end) + '（' + esc(a.hours) + ' 小時）' : '') + '<br>事由：' + esc(a.reason) + (a.note ? '<br>審核備註：' + esc(a.note) : '') + '</span>' +
+        '<span class="mute">' + esc(a.start) + (a.end ? ' ~ ' + esc(a.end) : '') + (a.hours ? '（' + esc(a.hours) + ' 小時）' : '') + '<br>事由：' + esc(a.reason) + (a.note ? '<br>審核備註：' + esc(a.note) : '') + '</span>' +
         (a.status === '待審核' ? '<br><button class="btn sm ghost" onclick="cancelApp(\'' + esc(a.id) + '\')">取消申請</button>' : '') + '</div>';
     }).join('') || '尚無申請';
   } catch (e) { toast(e.message, true); }
