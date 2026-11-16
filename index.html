@@ -5,26 +5,34 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>打卡</title>
 <link rel="stylesheet" href="style.css">
+<style>
+header { display: flex; align-items: center; gap: 10px; }
+header .ttl { flex: 1; min-width: 0; }
+#lang { width: auto; padding: 6px 8px; font-size: 14px; border: 0; border-radius: 8px; background: rgba(255,255,255,.95); color: #1f2933; }
+</style>
 </head>
 <body>
-<header><h1 id="company">打卡系統</h1><small id="who"></small></header>
+<header>
+  <div class="ttl"><h1 id="company">打卡系統</h1><small id="who"></small></div>
+  <select id="lang" onchange="setLang(this.value, true)" aria-label="Language"><option value="zh">中文</option><option value="vi">Tiếng Việt</option></select>
+</header>
 
-<div id="v-msg" style="display:none"><main><div class="card center" id="msg">載入中…</div></main></div>
+<div id="v-msg" style="display:none"><main><div class="card center" id="msg"></div></main></div>
 
 <div id="v-reg" style="display:none"><main>
   <div class="card">
-    <h2>第一次使用，請先註冊</h2>
-    <label>姓名（請填真實姓名）</label><input id="r-name" maxlength="30">
-    <label>部門</label><select id="r-dept"></select>
-    <p></p><div class="row"><button class="btn" onclick="register()">送出註冊</button></div>
+    <h2 data-t="regTitle"></h2>
+    <label data-t="regName"></label><input id="r-name" maxlength="30">
+    <label data-t="dept"></label><select id="r-dept"></select>
+    <p></p><div class="row"><button class="btn" onclick="register()" data-t="regSubmit"></button></div>
   </div>
 </main></div>
 
 <div id="v-main" style="display:none">
   <nav class="tabs">
-    <button class="tab on" data-tab="punch" onclick="showTab('punch')">打卡</button>
-    <button class="tab" data-tab="rec" onclick="showTab('rec');loadMonth()">出勤紀錄</button>
-    <button class="tab" data-tab="app" onclick="showTab('app');loadApps()">申請</button>
+    <button class="tab on" data-tab="punch" onclick="showTab('punch')" data-t="tabPunch"></button>
+    <button class="tab" data-tab="rec" onclick="showTab('rec');loadMonth()" data-t="tabRec"></button>
+    <button class="tab" data-tab="app" onclick="showTab('app');loadApps()" data-t="tabApp"></button>
   </nav>
   <main>
     <section class="page" id="p-punch">
@@ -35,15 +43,15 @@
       </div>
       <div class="card">
         <div class="stat" style="grid-template-columns:1fr 1fr">
-          <div><span class="mute">上班</span><b id="t-in">—</b></div>
-          <div><span class="mute">下班</span><b id="t-out">—</b></div>
+          <div><span class="mute" data-t="in"></span><b id="t-in">—</b></div>
+          <div><span class="mute" data-t="out"></span><b id="t-out">—</b></div>
         </div>
         <p></p>
         <div class="row">
-          <button class="btn" id="b-in" onclick="punch('上班')">上班打卡</button>
-          <button class="btn out" id="b-out" onclick="punch('下班')">下班打卡</button>
+          <button class="btn" id="b-in" onclick="punch('上班')" data-t="punchIn"></button>
+          <button class="btn out" id="b-out" onclick="punch('下班')" data-t="punchOut"></button>
         </div>
-        <p class="mute center" id="p-hint">打卡時會讀取您目前的位置，請允許定位權限。</p>
+        <p class="mute center" id="p-hint"></p>
       </div>
     </section>
 
@@ -52,62 +60,147 @@
         <div class="row"><input type="month" id="m-month" onchange="loadMonth()"></div>
         <p></p><div class="stat" id="m-sum"></div>
       </div>
-      <div class="card scroll"><table><thead><tr><th>日期</th><th>上班</th><th>下班</th><th>工時</th><th>狀態</th></tr></thead><tbody id="m-body"></tbody></table></div>
+      <div class="card scroll"><table><thead><tr><th data-t="thDate"></th><th data-t="in"></th><th data-t="out"></th><th data-t="thHours"></th><th data-t="thStatus"></th></tr></thead><tbody id="m-body"></tbody></table></div>
     </section>
 
     <section class="page" id="p-app" style="display:none">
       <div class="card">
-        <h2>新增申請</h2>
-        <label>類別</label>
-        <select id="a-kind" onchange="kindChange()"><option>補打卡</option><option>請假</option><option>加班</option></select>
-        <label id="a-sub-l">補哪一筆</label><select id="a-sub"></select>
-        <label id="a-start-l">打卡時間</label><input type="datetime-local" id="a-start">
+        <h2 data-t="newApp"></h2>
+        <label data-t="kind"></label>
+        <select id="a-kind" onchange="kindChange()"></select>
+        <label id="a-sub-l"></label><select id="a-sub"></select>
+        <label id="a-start-l"></label><input type="datetime-local" id="a-start">
         <div id="a-range">
-          <label>結束時間</label><input type="datetime-local" id="a-end">
-          <label>時數（小時）</label><input type="number" id="a-hours" min="0.5" step="0.5" inputmode="decimal">
+          <label data-t="endTime"></label><input type="datetime-local" id="a-end">
+          <label data-t="hoursLabel"></label><input type="number" id="a-hours" min="0.5" step="0.5" inputmode="decimal">
         </div>
-        <label>事由</label><textarea id="a-reason" rows="2" maxlength="200"></textarea>
-        <p></p><div class="row"><button class="btn" onclick="apply()">送出申請</button></div>
+        <label data-t="reason"></label><textarea id="a-reason" rows="2" maxlength="200"></textarea>
+        <p></p><div class="row"><button class="btn" onclick="apply()" data-t="submitApp"></button></div>
       </div>
-      <div class="card"><h2>我的申請</h2><div id="a-list" class="mute">載入中…</div></div>
+      <div class="card"><h2 data-t="myApps"></h2><div id="a-list" class="mute"></div></div>
     </section>
   </main>
 </div>
 
-<div id="busy">處理中…</div><div id="toast" class="toast"></div>
+<div id="busy"></div><div id="toast" class="toast"></div>
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script src="config.js"></script>
 <script src="common.js"></script>
 <script>
-let me = null;
+/* ============ 語言 ============ */
+const I18N = {
+  zh: {
+    loading: '載入中…', busy: '處理中…', loadFail: '無法載入：', title: '打卡',
+    regTitle: '第一次使用，請先註冊', regName: '姓名（請填真實姓名）', dept: '部門', pickDept: '請選擇部門', regSubmit: '送出註冊',
+    firstAdmin: '您是第一位註冊者，已設為管理員',
+    pending: '註冊已送出，請等待管理員核准後再開啟此頁面。', disabled: '您的帳號目前為「{0}」，無法打卡。',
+    tabPunch: '打卡', tabRec: '出勤紀錄', tabApp: '申請',
+    shift: '上班時間 {0} – {1}　打卡範圍 {2} 公尺',
+    in: '上班', out: '下班', punchIn: '上班打卡', punchOut: '下班打卡',
+    hint: '打卡時會讀取您目前的位置，請允許定位權限。',
+    punchOk: '{0}打卡成功 {1}（距離公司 {2} 公尺）', punchToast: '{0}打卡成功 {1}',
+    geoNone: '此裝置不支援定位', geoDenied: '定位權限被拒絕，請到手機設定允許 LINE 使用定位', geoFail: '無法取得定位，請到空曠處或開啟 GPS 後再試',
+    thDate: '日期', thHours: '工時', thStatus: '狀態', noData: '沒有資料',
+    sPresent: '出勤天數', sHours: '工時', sLate: '遲到', sEarly: '早退', sMissing: '缺卡', sAbsent: '缺勤', sLeave: '請假時數', sOt: '加班時數',
+    otDay: '加班 {0} 小時',
+    newApp: '新增申請', kind: '類別', whichPunch: '補哪一筆', leaveType: '假別', punchTime: '打卡時間', startTime: '開始時間', endTime: '結束時間',
+    hoursLabel: '時數（小時）', reason: '事由', submitApp: '送出申請', myApps: '我的申請', appSent: '申請已送出', noApps: '尚無申請',
+    hoursUnit: '（{0} 小時）', reasonPre: '事由：', notePre: '審核備註：', cancelApp: '取消申請', cancelled: '已取消',
+    wd: ['', '一', '二', '三', '四', '五', '六', '日'], wdFmt: '（{0}）', locale: 'zh-TW'
+  },
+  vi: {
+    loading: 'Đang tải…', busy: 'Đang xử lý…', loadFail: 'Không tải được: ', title: 'Chấm công',
+    regTitle: 'Lần đầu sử dụng, vui lòng đăng ký', regName: 'Họ tên (vui lòng điền tên thật)', dept: 'Bộ phận', pickDept: 'Chọn bộ phận', regSubmit: 'Gửi đăng ký',
+    firstAdmin: 'Bạn là người đăng ký đầu tiên và đã được đặt làm quản trị viên',
+    pending: 'Đã gửi đăng ký. Vui lòng chờ quản lý duyệt rồi mở lại trang này.', disabled: 'Tài khoản của bạn đang ở trạng thái "{0}", không thể chấm công.',
+    tabPunch: 'Chấm công', tabRec: 'Bảng công', tabApp: 'Đơn xin',
+    shift: 'Giờ làm {0} – {1}　Phạm vi chấm công {2} mét',
+    in: 'Giờ vào', out: 'Giờ ra', punchIn: 'Chấm công vào', punchOut: 'Chấm công ra',
+    hint: 'Khi chấm công, hệ thống sẽ đọc vị trí hiện tại của bạn. Vui lòng cho phép quyền định vị.',
+    punchOk: 'Chấm công {0} thành công lúc {1} (cách công ty {2} mét)', punchToast: 'Chấm công {0} thành công {1}',
+    geoNone: 'Thiết bị này không hỗ trợ định vị', geoDenied: 'Quyền định vị bị từ chối. Vui lòng vào cài đặt điện thoại và cho phép LINE sử dụng vị trí', geoFail: 'Không lấy được vị trí. Vui lòng ra nơi thoáng hoặc bật GPS rồi thử lại',
+    thDate: 'Ngày', thHours: 'Giờ làm', thStatus: 'Trạng thái', noData: 'Không có dữ liệu',
+    sPresent: 'Ngày đi làm', sHours: 'Giờ làm', sLate: 'Đi trễ', sEarly: 'Về sớm', sMissing: 'Thiếu chấm công', sAbsent: 'Vắng mặt', sLeave: 'Giờ nghỉ phép', sOt: 'Giờ tăng ca',
+    otDay: 'Tăng ca {0} giờ',
+    newApp: 'Tạo đơn mới', kind: 'Loại đơn', whichPunch: 'Bổ sung lần nào', leaveType: 'Loại nghỉ phép', punchTime: 'Thời gian chấm công', startTime: 'Thời gian bắt đầu', endTime: 'Thời gian kết thúc',
+    hoursLabel: 'Số giờ', reason: 'Lý do', submitApp: 'Gửi đơn', myApps: 'Đơn của tôi', appSent: 'Đã gửi đơn', noApps: 'Chưa có đơn nào',
+    hoursUnit: ' ({0} giờ)', reasonPre: 'Lý do: ', notePre: 'Ghi chú duyệt: ', cancelApp: 'Hủy đơn', cancelled: 'Đã hủy',
+    wd: ['', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'], wdFmt: ' ({0})', locale: 'vi-VN'
+  }
+};
+// 系統內以中文儲存的固定用語，顯示時翻成越南文；查不到就顯示原文
+const VI_TERMS = {
+  '上班': 'vào', '下班': 'ra',
+  '補打卡': 'Bổ sung chấm công', '請假': 'Nghỉ phép', '加班': 'Tăng ca',
+  '遲到': 'Đi trễ', '早退': 'Về sớm', '缺卡': 'Thiếu chấm công', '缺勤': 'Vắng mặt', '補卡': 'Chấm bù',
+  '待審核': 'Chờ duyệt', '已核准': 'Đã duyệt', '已駁回': 'Bị từ chối', '已取消': 'Đã hủy', '已作廢': 'Đã vô hiệu', '停用': 'Ngừng sử dụng',
+  '特休': 'Nghỉ phép năm', '事假': 'Nghỉ việc riêng', '病假': 'Nghỉ ốm', '公假': 'Nghỉ công vụ', '婚假': 'Nghỉ kết hôn', '喪假': 'Nghỉ tang', '其他': 'Khác',
+  '管理部': 'Bộ phận Quản lý', '業務部': 'Bộ phận Kinh doanh', '會計部': 'Bộ phận Kế toán', '製造部': 'Bộ phận Sản xuất', '包裝部': 'Bộ phận Đóng gói', '物流部': 'Bộ phận Hậu cần',
+  '公司安排加班': 'Công ty sắp xếp tăng ca', '管理人員登記': 'Quản lý đăng ký',
+  '國定假日': 'Ngày lễ', '週六': 'Thứ Bảy', '週日': 'Chủ nhật', '平日': 'Ngày thường'
+};
+const PUNCH_SUB_VI = { '上班': 'Giờ vào', '下班': 'Giờ ra' };
+let LANG = 'zh';
+const t = (k, ...a) => { let s = (I18N[LANG][k] !== undefined ? I18N[LANG][k] : I18N.zh[k]) || ''; a.forEach((v, i) => { s = s.replace('{' + i + '}', v); }); return s; };
+const term = (v) => (LANG === 'vi' && VI_TERMS[v]) || v;                         // 只顯示譯文
+const termBoth = (v) => (LANG === 'vi' && VI_TERMS[v]) ? VI_TERMS[v] + '（' + v + '）' : v;   // 譯文＋中文原文（部門、假別）
+function applyLang() {
+  document.documentElement.lang = LANG === 'vi' ? 'vi' : 'zh-Hant';
+  document.title = t('title'); $('lang').value = LANG; $('busy').textContent = t('busy');
+  document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.dataset.t); });
+}
+function storedLang() { try { return localStorage.getItem('lang'); } catch (e) { return null; } }
+async function setLang(l, byUser) {
+  LANG = l === 'vi' ? 'vi' : 'zh';
+  try { localStorage.setItem('lang', LANG); } catch (e) { /* ignore */ }
+  applyLang();
+  if (me) render();
+  if (byUser && me && me.registered) { try { await api('setLang', { lang: LANG }, true); me.lang = LANG; } catch (e) { /* ignore */ } }
+}
+const call = (action, data, quiet) => api(action, Object.assign({ lang: LANG }, data || {}), quiet);
+
+/* ============ 畫面 ============ */
+let me = null, curTab = 'punch';
 function view(v) { ['msg', 'reg', 'main'].forEach((x) => { $('v-' + x).style.display = x === v ? 'block' : 'none'; }); }
-function message(html) { $('msg').innerHTML = html; view('msg'); }
+function message(text) { $('msg').textContent = text; view('msg'); }
+const _showTab = showTab;
+showTab = function (name) { curTab = name; _showTab(name); };
 
 async function start() {
-  view('msg');
+  LANG = storedLang() === 'vi' ? 'vi' : 'zh';
+  applyLang(); message(t('loading'));
   try {
     if (!(await login())) return;
-    me = await api('me', {}, true);
-    render();
-  } catch (e) { message('無法載入：' + esc(e.message)); }
+    if (!storedLang()) { try { if (String(liff.getLanguage() || '').toLowerCase().indexOf('vi') === 0) LANG = 'vi'; } catch (e) { /* ignore */ } }
+    me = await call('me', {}, true);
+    if (me.registered && me.lang) LANG = me.lang;          // 已註冊者以系統紀錄的語言為準
+    else if (me.registered && !me.lang) api('setLang', { lang: LANG }, true).catch(() => {});
+    applyLang(); render(true);
+  } catch (e) { message(t('loadFail') + e.message); }
 }
-function render() {
+function render(first) {
   $('company').textContent = me.company;
   if (!me.registered) {
-    $('r-name').value = '';
-    $('r-dept').innerHTML = '<option value="">請選擇部門</option>' + me.depts.map((d) => '<option>' + esc(d) + '</option>').join('');
+    const keep = $('r-dept').value;
+    $('r-dept').innerHTML = '<option value="">' + esc(t('pickDept')) + '</option>' + me.depts.map((d) => '<option value="' + esc(d) + '">' + esc(termBoth(d)) + '</option>').join('');
+    $('r-dept').value = keep;
     view('reg'); return;
   }
-  $('who').textContent = me.name + (me.dept ? '・' + me.dept : '');
-  if (me.status === '待審核') { message('註冊已送出，請等待管理員核准後再開啟此頁面。'); return; }
-  if (me.status !== '在職') { message('您的帳號目前為「' + esc(me.status) + '」，無法打卡。'); return; }
-  $('shift').textContent = '上班時間 ' + me.start + ' – ' + me.end + '　打卡範圍 ' + me.radius + ' 公尺';
-  $('m-month').value = thisMonth();
+  $('who').textContent = me.name + (me.dept ? '・' + term(me.dept) : '');
+  if (me.status === '待審核') { message(t('pending')); return; }
+  if (me.status !== '在職') { message(t('disabled', term(me.status))); return; }
+  $('shift').textContent = t('shift', me.start, me.end, me.radius);
+  if (!$('m-month').value) $('m-month').value = thisMonth();
+  if (!$('p-hint').dataset.set) $('p-hint').textContent = t('hint');
+  $('a-kind').innerHTML = ['補打卡', '請假', '加班'].map((k) => '<option value="' + k + '"' + ($('a-kind').value === k ? ' selected' : '') + '>' + esc(term(k)) + '</option>').join('');
   kindChange(); renderPunch(); view('main');
-  // 圖文選單可用 ?tab=rec 或 ?tab=app 直接開啟指定分頁
-  const tab = new URLSearchParams(location.search).get('tab');
-  if (tab === 'rec') { showTab('rec'); loadMonth(); }
-  else if (tab === 'app') { showTab('app'); loadApps(); }
+  if (first) {
+    // 圖文選單可用 ?tab=rec 或 ?tab=app 直接開啟指定分頁
+    const tab = new URLSearchParams(location.search).get('tab');
+    if (tab === 'rec') { showTab('rec'); loadMonth(); }
+    else if (tab === 'app') { showTab('app'); loadApps(); }
+  } else if (curTab === 'rec') loadMonth();
+  else if (curTab === 'app') loadApps();
 }
 function renderPunch() {
   $('t-in').textContent = hm(me.punch.in); $('t-out').textContent = hm(me.punch.out);
@@ -116,80 +209,87 @@ function renderPunch() {
 setInterval(() => {
   const d = new Date();
   $('clock').textContent = d.toLocaleTimeString('zh-TW', { hour12: false, timeZone: 'Asia/Taipei' });
-  $('date').textContent = d.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long', timeZone: 'Asia/Taipei' });
+  $('date').textContent = d.toLocaleDateString(t('locale'), { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long', timeZone: 'Asia/Taipei' });
 }, 500);
 
 async function register() {
   try {
-    const r = await api('register', { name: $('r-name').value, dept: $('r-dept').value });
-    if (r.first) toast('您是第一位註冊者，已設為管理員');
-    me = await api('me'); render();
+    const r = await call('register', { name: $('r-name').value, dept: $('r-dept').value });
+    if (r.first) toast(t('firstAdmin'));
+    me = await call('me'); render(true);
   } catch (e) { toast(e.message, true); }
 }
 
 function getPos() {
   return new Promise((ok, fail) => {
-    if (!navigator.geolocation) return fail(new Error('此裝置不支援定位'));
+    if (!navigator.geolocation) return fail(new Error(t('geoNone')));
     navigator.geolocation.getCurrentPosition(ok, (err) => {
-      fail(new Error(err.code === 1 ? '定位權限被拒絕，請到手機設定允許 LINE 使用定位' : '無法取得定位，請到空曠處或開啟 GPS 後再試'));
+      fail(new Error(err.code === 1 ? t('geoDenied') : t('geoFail')));
     }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
   });
 }
 async function punch(type) {
   busy(true);
+  const hint = $('p-hint'); hint.dataset.set = '1';
   try {
     const pos = await getPos();
-    const r = await api('punch', { type: type, lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy });
+    const r = await call('punch', { type: type, lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy });
     me.punch = r.punch; renderPunch();
-    $('p-hint').textContent = type + '打卡成功 ' + r.time + '（距離公司 ' + r.distance + ' 公尺）';
-    toast(type + '打卡成功 ' + r.time.slice(0, 5));
-  } catch (e) { toast(e.message, true); $('p-hint').textContent = e.message; }
+    hint.textContent = t('punchOk', term(type), r.time, r.distance);
+    toast(t('punchToast', term(type), r.time.slice(0, 5)));
+  } catch (e) { toast(e.message, true); hint.textContent = e.message; }
   finally { busy(false); }
 }
 
+function dayTags(flags) {
+  const cls = { '遲到': 'warn', '早退': 'warn', '缺卡': 'bad', '缺勤': 'bad', '請假': 'info', '補卡': 'info' };
+  return flags.map((f) => '<span class="tag ' + (cls[f] || '') + '">' + esc(term(f)) + '</span>').join('');
+}
 async function loadMonth() {
   try {
-    const r = await api('myMonth', { month: $('m-month').value });
+    const r = await call('myMonth', { month: $('m-month').value });
     const s = r.summary;
-    $('m-sum').innerHTML = [['出勤天數', s.present], ['工時', s.workHours], ['遲到', s.late], ['早退', s.early], ['缺卡', s.missing], ['缺勤', s.absent], ['請假時數', s.leaveHours], ['加班時數', s.otHours]]
-      .map((x) => '<div><span class="mute">' + x[0] + '</span><b>' + x[1] + '</b></div>').join('');
+    $('m-sum').innerHTML = [['sPresent', s.present], ['sHours', s.workHours], ['sLate', s.late], ['sEarly', s.early], ['sMissing', s.missing], ['sAbsent', s.absent], ['sLeave', s.leaveHours], ['sOt', s.otHours]]
+      .map((x) => '<div><span class="mute">' + esc(t(x[0])) + '</span><b>' + x[1] + '</b></div>').join('');
     $('m-body').innerHTML = r.days.slice().reverse().map((d) =>
-      '<tr class="' + (d.isWork ? '' : 'off') + '"><td>' + d.date.slice(5) + '（' + WD[d.wd] + '）</td><td>' + hm(d.in) + '</td><td>' + hm(d.out) + '</td><td>' +
-      (d.workMin ? (d.workMin / 60).toFixed(1) : '') + '</td><td>' + flagHtml(d.flags) + (d.leave ? esc(d.leave) : '') + (d.holiday ? esc(d.holiday) : '') + (d.ot ? ' 加班' + d.ot + 'h' : '') + '</td></tr>').join('') ||
-      '<tr><td colspan="5" class="mute">沒有資料</td></tr>';
+      '<tr class="' + (d.isWork ? '' : 'off') + '"><td>' + d.date.slice(5) + esc(t('wdFmt', I18N[LANG].wd[d.wd])) + '</td><td>' + hm(d.in) + '</td><td>' + hm(d.out) + '</td><td>' +
+      (d.workMin ? (d.workMin / 60).toFixed(1) : '') + '</td><td>' + dayTags(d.flags) + (d.leave ? esc(termBoth(d.leave)) : '') + (d.holiday ? esc(d.holiday) : '') + (d.ot ? ' ' + esc(t('otDay', d.ot)) : '') + '</td></tr>').join('') ||
+      '<tr><td colspan="5" class="mute">' + esc(t('noData')) + '</td></tr>';
   } catch (e) { toast(e.message, true); }
 }
 
 function kindChange() {
-  const k = $('a-kind').value;
+  const k = $('a-kind').value || '補打卡', keep = $('a-sub').value;
   const opts = k === '補打卡' ? ['上班', '下班'] : k === '請假' ? me.leaveTypes : [];
-  $('a-sub').innerHTML = opts.map((o) => '<option>' + esc(o) + '</option>').join('');
+  $('a-sub').innerHTML = opts.map((o) => '<option value="' + esc(o) + '">' + esc(k === '補打卡' ? (LANG === 'vi' ? PUNCH_SUB_VI[o] : o) : termBoth(o)) + '</option>').join('');
+  if (opts.indexOf(keep) >= 0) $('a-sub').value = keep;
   $('a-sub').style.display = $('a-sub-l').style.display = opts.length ? 'block' : 'none';
-  $('a-sub-l').textContent = k === '補打卡' ? '補哪一筆' : '假別';
-  $('a-start-l').textContent = k === '補打卡' ? '打卡時間' : '開始時間';
+  $('a-sub-l').textContent = k === '補打卡' ? t('whichPunch') : t('leaveType');
+  $('a-start-l').textContent = k === '補打卡' ? t('punchTime') : t('startTime');
   $('a-range').style.display = k === '補打卡' ? 'none' : 'block';
 }
 async function apply() {
   try {
-    await api('apply', { kind: $('a-kind').value, sub: $('a-sub').value, start: $('a-start').value, end: $('a-end').value, hours: $('a-hours').value, reason: $('a-reason').value });
-    toast('申請已送出');
+    await call('apply', { kind: $('a-kind').value, sub: $('a-sub').value, start: $('a-start').value, end: $('a-end').value, hours: $('a-hours').value, reason: $('a-reason').value });
+    toast(t('appSent'));
     $('a-reason').value = ''; $('a-start').value = ''; $('a-end').value = ''; $('a-hours').value = '';
     loadApps();
   } catch (e) { toast(e.message, true); }
 }
 async function loadApps() {
   try {
-    const list = await api('myApps', {}, true);
+    const list = await call('myApps', {}, true);
     $('a-list').innerHTML = list.map((a) => {
       const cls = { '待審核': 'warn', '已核准': 'ok', '已駁回': 'bad' }[a.status] || '';
-      return '<div class="item"><span class="tag ' + cls + '">' + esc(a.status) + '</span><b>' + esc(a.kind) + (a.sub ? '・' + esc(a.sub) : '') + '</b><br>' +
-        '<span class="mute">' + esc(a.start) + (a.end ? ' ~ ' + esc(a.end) : '') + (a.hours ? '（' + esc(a.hours) + ' 小時）' : '') + '<br>事由：' + esc(a.reason) + (a.note ? '<br>審核備註：' + esc(a.note) : '') + '</span>' +
-        (a.status === '待審核' ? '<br><button class="btn sm ghost" onclick="cancelApp(\'' + esc(a.id) + '\')">取消申請</button>' : '') + '</div>';
-    }).join('') || '尚無申請';
+      const sub = a.sub ? (a.kind === '補打卡' && LANG === 'vi' ? PUNCH_SUB_VI[a.sub] || a.sub : termBoth(a.sub)) : '';
+      return '<div class="item"><span class="tag ' + cls + '">' + esc(term(a.status)) + '</span><b>' + esc(term(a.kind)) + (sub ? '・' + esc(sub) : '') + '</b><br>' +
+        '<span class="mute">' + esc(a.start) + (a.end ? ' ~ ' + esc(a.end) : '') + (a.hours ? esc(t('hoursUnit', a.hours)) : '') + '<br>' + esc(t('reasonPre')) + esc(term(a.reason)) + (a.note ? '<br>' + esc(t('notePre')) + esc(LANG === 'vi' ? a.note.replace(/^登記人：/, 'Người đăng ký: ') : a.note) : '') + '</span>' +
+        (a.status === '待審核' ? '<br><button class="btn sm ghost" onclick="cancelApp(\'' + esc(a.id) + '\')">' + esc(t('cancelApp')) + '</button>' : '') + '</div>';
+    }).join('') || esc(t('noApps'));
   } catch (e) { toast(e.message, true); }
 }
 async function cancelApp(id) {
-  try { await api('cancel', { id: id }); toast('已取消'); loadApps(); } catch (e) { toast(e.message, true); }
+  try { await call('cancel', { id: id }); toast(t('cancelled')); loadApps(); } catch (e) { toast(e.message, true); }
 }
 start();
 </script>
