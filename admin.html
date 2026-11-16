@@ -5,6 +5,30 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>打卡管理後台</title>
 <link rel="stylesheet" href="style.css">
+<style>
+.chips { display: flex; flex-wrap: wrap; gap: 6px; max-height: 190px; overflow-y: auto; padding: 2px; }
+.chip { display: inline-flex; align-items: center; margin: 0; padding: 7px 12px; border: 1px solid var(--line); border-radius: 99px; font-size: 14px; color: var(--ink); cursor: pointer; user-select: none; background: #fff; }
+.chip input { display: none; }
+.chip.on { background: var(--g); border-color: var(--g); color: #fff; font-weight: 600; }
+.chip small { opacity: .75; margin-left: 4px; }
+.cal-head { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 8px; }
+.cal-head b { font-size: 17px; }
+.cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal .wk { text-align: center; font-size: 12px; color: var(--mute); padding: 2px 0; }
+.cal .day { position: relative; min-height: 54px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 15px; font-family: inherit; color: var(--ink); cursor: pointer; padding: 4px 2px 16px; }
+.cal .day.rest { background: #f6f7f9; color: #9aa3ad; }
+.cal .day.hol { background: #fdf0f0; color: #c23535; }
+.cal .day.today { border: 2px solid var(--ink); }
+.cal .day.sel { background: var(--g); border-color: var(--gd); color: #fff; font-weight: 700; }
+.cal .day .n { position: absolute; left: 0; right: 0; bottom: 3px; font-size: 10.5px; font-weight: 600; color: var(--warn); }
+.cal .day.sel .n { color: #fff; }
+.cal .pad { min-height: 54px; }
+.otd { font-weight: 700; margin: 12px 0 2px; padding-top: 10px; border-top: 1px solid var(--line); }
+.otd:first-child { border: 0; margin-top: 0; padding-top: 0; }
+.otr { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 14px; }
+.otr span { flex: 1; }
+.sum { background: var(--bg); border-radius: 10px; padding: 10px 12px; margin-top: 12px; font-size: 14px; }
+</style>
 </head>
 <body>
 <header><h1 id="company">打卡管理後台</h1><small id="who"></small></header>
@@ -14,7 +38,7 @@
   <nav class="tabs">
     <button class="tab on" data-tab="today" onclick="showTab('today');loadToday()">今日出勤</button>
     <button class="tab" data-admin data-tab="apps" onclick="showTab('apps');loadApps()">審核<span id="n-apps"></span></button>
-    <button class="tab" data-tab="ot" onclick="showTab('ot');loadOt()">加班登記</button>
+    <button class="tab" data-tab="ot" onclick="showTab('ot');otOpen()">加班登記</button>
     <button class="tab" data-admin data-tab="emps" onclick="showTab('emps');loadEmps()">員工<span id="n-emps"></span></button>
     <button class="tab" data-tab="report" onclick="showTab('report')">月報表</button>
     <button class="tab" data-admin data-tab="set" onclick="showTab('set');loadSettings()">設定</button>
@@ -31,10 +55,38 @@
     </section>
 
     <section class="page" id="p-ot" style="display:none">
-      <div class="card"><div class="row"><input type="date" id="o-date" onchange="loadOt()"><button class="btn sm ghost" onclick="loadOt()">重新整理</button></div>
-        <p class="mute" id="o-info" style="margin:8px 0 0"></p></div>
-      <div class="card scroll"><table><thead><tr><th>姓名</th><th>部門</th><th>上班</th><th>下班</th><th>超時</th><th>加班時數</th><th></th></tr></thead><tbody id="o-body"></tbody></table></div>
-      <p class="mute">在「加班時數」填入當天要計入的加班總時數後按「儲存」。填 0 代表取消當天的加班。員工自己申請並已核准的加班也會顯示在這裡，儲存後以這裡的數字為準。</p>
+      <div class="card">
+        <h2>安排加班</h2>
+        <label>① 部門</label>
+        <select id="ob-dept" onchange="otRenderEmps()"></select>
+        <label>② 員工（點選可複選）</label>
+        <div class="row" style="margin-bottom:6px"><button class="btn sm ghost" onclick="otPickAll(true)">全選此部門</button><button class="btn sm ghost" onclick="otPickAll(false)">全部清除</button></div>
+        <div id="ob-emps" class="chips"></div>
+        <label>③ 日期（點選可複選，可跨月）</label>
+        <div class="cal-head"><button class="btn sm ghost" onclick="otMonthMove(-1)">‹ 上個月</button><b id="ob-month"></b><button class="btn sm ghost" onclick="otMonthMove(1)">下個月 ›</button></div>
+        <div class="cal" id="ob-cal"></div>
+        <p class="mute" style="margin:6px 0 0">綠色＝已選取　灰底＝非上班日　紅底＝假日　橘色數字＝當天已登記加班的人數</p>
+        <label>④ 加班時間（開始 ～ 結束）</label>
+        <div class="row"><input type="time" id="ob-start" onchange="otCalcHours()"><input type="time" id="ob-end" onchange="otCalcHours()"></div>
+        <label>每天加班時數（依時間自動計算並扣除午休，可自行修改）</label>
+        <input type="number" id="ob-hours" min="0.5" max="24" step="0.5" inputmode="decimal" oninput="otSummary()">
+        <label>備註（會顯示在通知裡，可不填）</label>
+        <input id="ob-note" maxlength="100" placeholder="例如：趕出貨">
+        <label style="display:flex;gap:8px;align-items:center;color:var(--ink);margin-top:12px"><input type="checkbox" id="ob-notify" checked style="width:auto" onchange="otSummary()"> 用 LINE 通知被安排的員工</label>
+        <div class="sum" id="ob-sum"></div>
+        <p></p><div class="row"><button class="btn" id="ob-go" onclick="otSubmit()">登記加班</button></div>
+      </div>
+
+      <div class="card"><h2 id="ob-list-title">已登記的加班</h2><div id="ob-list" class="mute">載入中…</div></div>
+
+      <div class="card">
+        <h2>依打卡核對單日加班</h2>
+        <p class="mute">加班當天結束後，可以在這裡對照實際打卡時間，調整或取消時數。這裡的修改不會發通知。</p>
+        <div class="row"><input type="date" id="o-date" onchange="loadOt()"><button class="btn sm ghost" onclick="loadOt()">重新整理</button></div>
+        <p class="mute" id="o-info" style="margin:8px 0"></p>
+        <div class="scroll"><table><thead><tr><th>姓名</th><th>部門</th><th>上班</th><th>下班</th><th>超時</th><th>加班時數</th><th></th></tr></thead><tbody id="o-body"></tbody></table></div>
+        <p class="mute" style="margin-top:8px">「加班時數」是當天要計入的總時數，填 0 代表取消。</p>
+      </div>
     </section>
 
     <section class="page" id="p-emps" style="display:none">
@@ -110,6 +162,128 @@ async function review(id, approve) {
   } catch (e) { toast(e.message, true); }
 }
 
+/* ---------- 加班行事曆 ---------- */
+const ot = { month: '', days: new Set(), emps: new Set(), data: null };
+const tmin = (t) => { const a = String(t).split(':'); return +a[0] * 60 + +a[1]; };
+const tfmt = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+const dlabel = (d) => +d.slice(5, 7) + '/' + +d.slice(8, 10) + '（' + WD[wdOf(d)] + '）';
+function wdOf(d) { const a = d.split('-'); const w = new Date(+a[0], +a[1] - 1, +a[2]).getDay(); return w === 0 ? 7 : w; }
+function otType(d) { const w = wdOf(d); return ot.data.holidays[d] ? '國定假日' : w === 6 ? '週六' : w === 7 ? '週日' : '平日'; }
+
+async function otOpen() {
+  if (!ot.month) ot.month = $('o-date').value.slice(0, 7);
+  await otLoadMonth();
+  loadOt();
+}
+async function otLoadMonth() {
+  try {
+    ot.data = await api('otMonth', { month: ot.month });
+    if (!$('ob-dept').options.length) {
+      const ds = Array.from(new Set(depts.concat(ot.data.emps.map((e) => e.dept).filter(Boolean))));
+      $('ob-dept').innerHTML = '<option value="">全部部門</option>' + ds.map((d) => '<option>' + esc(d) + '</option>').join('');
+    }
+    if (!$('ob-start').value) {
+      $('ob-start').value = ot.data.end;
+      $('ob-end').value = tfmt(Math.min(tmin(ot.data.end) + 120, 23 * 60 + 59));
+      otCalcHours();
+    }
+    otRenderEmps(); otRenderCal(); otRenderList(); otSummary();
+  } catch (e) { toast(e.message, true); }
+}
+function otMonthMove(n) {
+  const a = ot.month.split('-'); const d = new Date(+a[0], +a[1] - 1 + n, 1);
+  ot.month = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  otLoadMonth();
+}
+function otRenderEmps() {
+  const dept = $('ob-dept').value;
+  const list = ot.data.emps.filter((e) => !dept || e.dept === dept);
+  $('ob-emps').innerHTML = list.map((e) => '<span class="chip' + (ot.emps.has(e.userId) ? ' on' : '') + '" data-uid="' + esc(e.userId) + '" onclick="otToggleEmp(this)">' + esc(e.name) + (dept ? '' : '<small>' + esc(e.dept) + '</small>') + '</span>').join('') ||
+    '<span class="mute">這個部門沒有在職員工</span>';
+}
+function otToggleEmp(el) {
+  const id = el.dataset.uid;
+  if (ot.emps.has(id)) ot.emps.delete(id); else ot.emps.add(id);
+  el.classList.toggle('on'); otSummary();
+}
+function otPickAll(on) {
+  if (!on) ot.emps.clear();
+  else { const dept = $('ob-dept').value; ot.data.emps.filter((e) => !dept || e.dept === dept).forEach((e) => ot.emps.add(e.userId)); }
+  otRenderEmps(); otSummary();
+}
+function otRenderCal() {
+  const a = ot.month.split('-'), y = +a[0], m = +a[1];
+  $('ob-month').textContent = y + ' 年 ' + m + ' 月';
+  const n = new Date(y, m, 0).getDate(), first = wdOf(ot.month + '-01');
+  const cnt = {};
+  ot.data.items.forEach((x) => { (cnt[x.date] = cnt[x.date] || new Set()).add(x.userId); });
+  let h = ['一', '二', '三', '四', '五', '六', '日'].map((w) => '<div class="wk">' + w + '</div>').join('');
+  for (let i = 1; i < first; i++) h += '<div class="pad"></div>';
+  for (let i = 1; i <= n; i++) {
+    const d = ot.month + '-' + String(i).padStart(2, '0');
+    const cls = ['day'];
+    if (ot.data.holidays[d]) cls.push('hol'); else if (ot.data.workdays.indexOf(wdOf(d)) < 0) cls.push('rest');
+    if (d === ot.data.today) cls.push('today');
+    if (ot.days.has(d)) cls.push('sel');
+    h += '<button type="button" class="' + cls.join(' ') + '" data-d="' + d + '" onclick="otToggleDay(this)"' + (ot.data.holidays[d] ? ' title="' + esc(ot.data.holidays[d]) + '"' : '') + '>' + i +
+      (cnt[d] ? '<span class="n">' + cnt[d].size + ' 人</span>' : '') + '</button>';
+  }
+  $('ob-cal').innerHTML = h;
+}
+function otToggleDay(el) {
+  const d = el.dataset.d;
+  if (ot.days.has(d)) ot.days.delete(d); else ot.days.add(d);
+  el.classList.toggle('sel'); otSummary();
+}
+function otCalcHours() {
+  const s = $('ob-start').value, e = $('ob-end').value;
+  if (!s || !e || e <= s) { otSummary(); return; }
+  const a = tmin(s), b = tmin(e), ls = tmin(ot.data.lunchStart), le = tmin(ot.data.lunchEnd);
+  const mins = (b - a) - Math.max(0, Math.min(b, le) - Math.max(a, ls));
+  $('ob-hours').value = Math.round(mins / 30) / 2 || '';
+  otSummary();
+}
+function otSummary() {
+  if (!ot.data) return;
+  const days = Array.from(ot.days).sort(), p = ot.emps.size, hrs = Number($('ob-hours').value) || 0;
+  const names = ot.data.emps.filter((e) => ot.emps.has(e.userId)).map((e) => e.name);
+  $('ob-go').textContent = p && days.length ? '登記加班（' + p + ' 人 × ' + days.length + ' 天）' : '登記加班';
+  $('ob-sum').innerHTML = !p && !days.length ? '請先選擇員工與日期。' :
+    '<b>員工（' + p + '）：</b>' + (names.length ? esc(names.join('、')) : '尚未選擇') + (names.length < p ? ' 等' : '') +
+    '<br><b>日期（' + days.length + '）：</b>' + (days.length ? days.map(dlabel).join('、') : '尚未選擇') +
+    '<br><b>時間：</b>' + esc($('ob-start').value) + ' ～ ' + esc($('ob-end').value) + '，每天 ' + hrs + ' 小時' +
+    (p && days.length && $('ob-notify').checked ? '<br><span class="mute">將發出 ' + p + ' 則 LINE 通知（每人一則，列出所有日期）。</span>' : '');
+}
+async function otSubmit() {
+  try {
+    const days = Array.from(ot.days).sort();
+    const r = await api('otBatch', { userIds: Array.from(ot.emps), dates: days, start: $('ob-start').value, end: $('ob-end').value, hours: $('ob-hours').value, note: $('ob-note').value, notify: $('ob-notify').checked });
+    toast('已登記 ' + r.people + ' 人 × ' + r.days + ' 天的加班' + ($('ob-notify').checked ? '，並已發送通知' : ''));
+    ot.days.clear(); $('ob-note').value = '';
+    await otLoadMonth(); loadOt();
+  } catch (e) { toast(e.message, true); }
+}
+function otRenderList() {
+  const a = ot.month.split('-');
+  $('ob-list-title').textContent = +a[0] + ' 年 ' + +a[1] + ' 月已登記的加班';
+  const by = {};
+  ot.data.items.forEach((x) => { (by[x.date] = by[x.date] || []).push(x); });
+  $('ob-list').innerHTML = Object.keys(by).sort().map((d) =>
+    '<div class="otd">' + dlabel(d) + '　<span class="tag ' + (otType(d) === '平日' ? '' : 'warn') + '">' + otType(d) + '加班</span>' + (d < ot.data.today ? '<span class="tag">已過</span>' : '') + '</div>' +
+    by[d].map((x) => '<div class="otr"><span><b>' + esc(x.name) + '</b>　' + esc(x.dept) + '　' + (x.end ? esc(x.start) + '–' + esc(x.end) + '　' : '') + x.hours + ' 小時</span>' +
+      '<button class="btn sm ghost" data-uid="' + esc(x.userId) + '" data-d="' + d + '" onclick="otCancel(this)">取消</button></div>').join('')).join('') ||
+    '這個月還沒有登記加班。';
+}
+async function otCancel(btn) {
+  const d = btn.dataset.d;
+  try {
+    await api('setOt', { userId: btn.dataset.uid, date: d, hours: 0, notify: d >= ot.data.today });
+    toast('已取消' + (d >= ot.data.today ? '，並已通知員工' : ''));
+    await otLoadMonth(); loadOt();
+  } catch (e) { toast(e.message, true); }
+}
+
+/* ---------- 單日核對 ---------- */
 async function loadOt() {
   try {
     const r = await api('otDay', { date: $('o-date').value });
@@ -124,7 +298,7 @@ async function loadOt() {
 async function saveOt(i, btn) {
   try {
     await api('setOt', { userId: btn.closest('tr').dataset.uid, date: $('o-date').value, hours: $('oh-' + i).value || 0 });
-    toast('加班時數已儲存'); loadOt();
+    toast('加班時數已儲存'); loadOt(); otLoadMonth();
   } catch (e) { toast(e.message, true); }
 }
 
