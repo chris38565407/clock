@@ -100,6 +100,10 @@ function render() {
   $('shift').textContent = '上班時間 ' + me.start + ' – ' + me.end + '　打卡範圍 ' + me.radius + ' 公尺';
   $('m-month').value = thisMonth();
   kindChange(); renderPunch(); view('main');
+  // 圖文選單可用 ?tab=rec 或 ?tab=app 直接開啟指定分頁
+  const tab = new URLSearchParams(location.search).get('tab');
+  if (tab === 'rec') { showTab('rec'); loadMonth(); }
+  else if (tab === 'app') { showTab('app'); loadApps(); }
 }
 function renderPunch() {
   $('t-in').textContent = hm(me.punch.in); $('t-out').textContent = hm(me.punch.out);
