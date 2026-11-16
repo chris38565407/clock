@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>打卡</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><h1 id="company">打卡系統</h1><small id="who"></small></header>
+
+<div id="v-msg" style="display:none"><main><div class="card center" id="msg">載入中…</div></main></div>
+
+<div id="v-reg" style="display:none"><main>
+  <div class="card">
+    <h2>第一次使用，請先註冊</h2>
+    <label>姓名（請填真實姓名）</label><input id="r-name" maxlength="30">
+    <label>部門（可不填）</label><input id="r-dept" maxlength="30">
+    <p></p><div class="row"><button class="btn" onclick="register()">送出註冊</button></div>
+  </div>
+</main></div>
+
+<div id="v-main" style="display:none">
+  <nav class="tabs">
+    <button class="tab on" data-tab="punch" onclick="showTab('punch')">打卡</button>
+    <button class="tab" data-tab="rec" onclick="showTab('rec');loadMonth()">出勤紀錄</button>
+    <button class="tab" data-tab="app" onclick="showTab('app');loadApps()">申請</button>
+  </nav>
+  <main>
+    <section class="page" id="p-punch">
+      <div class="card center">
+        <div class="mute" id="date"></div>
+        <div class="clock" id="clock">--:--:--</div>
+        <div class="mute" id="shift"></div>
+      </div>
+      <div class="card">
+        <div class="stat" style="grid-template-columns:1fr 1fr">
+          <div><span class="mute">上班</span><b id="t-in">—</b></div>
+          <div><span class="mute">下班</span><b id="t-out">—</b></div>
+        </div>
+        <p></p>
+        <div class="row">
+          <button class="btn" id="b-in" onclick="punch('上班')">上班打卡</button>
+          <button class="btn out" id="b-out" onclick="punch('下班')">下班打卡</button>
+        </div>
+        <p class="mute center" id="p-hint">打卡時會讀取您目前的位置，請允許定位權限。</p>
+      </div>
+    </section>
+
+    <section class="page" id="p-rec" style="display:none">
+      <div class="card">
+        <div class="row"><input type="month" id="m-month" onchange="loadMonth()"></div>
+        <p></p><div class="stat" id="m-sum"></div>
+      </div>
+      <div class="card scroll"><table><thead><tr><th>日期</th><th>上班</th><th>下班</th><th>工時</th><th>狀態</th></tr></thead><tbody id="m-body"></tbody></table></div>
+    </section>
+
+    <section class="page" id="p-app" style="display:none">
+      <div class="card">
+        <h2>新增申請</h2>
+        <label>類別</label>
+        <select id="a-kind" onchange="kindChange()"><option>補打卡</option><option>請假</option><option>加班</option></select>
+        <label id="a-sub-l">補哪一筆</label><select id="a-sub"></select>
+        <label id="a-start-l">打卡時間</label><input type="datetime-local" id="a-start">
+        <div id="a-range">
+          <label>結束時間</label><input type="datetime-local" id="a-end">
+          <label>時數（小時）</label><input type="number" id="a-hours" min="0.5" step="0.5" inputmode="decimal">
+        </div>
+        <label>事由</label><textarea id="a-reason" rows="2" maxlength="200"></textarea>
+        <p></p><div class="row"><button class="btn" onclick="apply()">送出申請</button></div>
+      </div>
+      <div class="card"><h2>我的申請</h2><div id="a-list" class="mute">載入中…</div></div>
+    </section>
+  </main>
+</div>
+
+<div id="busy">處理中…</div><div id="toast" class="toast"></div>
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script>
+let me = null;
+function view(v) { ['msg', 'reg', 'main'].forEach((x) => { $('v-' + x).style.display = x === v ? 'block' : 'none'; }); }
+function message(html) { $('msg').innerHTML = html; view('msg'); }
+
+async function start() {
+  view('msg');
+  try {
+    if (!(await login())) return;
+    me = await api('me', {}, true);
+    render();
+  } catch (e) { message('無法載入：' + esc(e.message)); }
+}
+function render() {
+  $('company').textContent = me.company;
+  if (!me.registered) { $('r-name').value = ''; view('reg'); return; }
+  $('who').textContent = me.name + (me.dept ? '・' + me.dept : '');
+  if (me.status === '待審核') { message('註冊已送出，請等待管理員核准後再開啟此頁面。'); return; }
+  if (me.status !== '在職') { message('您的帳號目前為「' + esc(me.status) + '」，無法打卡。'); return; }
+  $('shift').textContent = '上班時間 ' + me.start + ' – ' + me.end + '　打卡範圍 ' + me.radius + ' 公尺';
+  $('m-month').value = thisMonth();
+  kindChange(); renderPunch(); view('main');
+}
+function renderPunch() {
+  $('t-in').textContent = hm(me.punch.in); $('t-out').textContent = hm(me.punch.out);
+  $('b-in').disabled = !!me.punch.in;
+}
+setInterval(() => {
+  const d = new Date();
+  $('clock').textContent = d.toLocaleTimeString('zh-TW', { hour12: false, timeZone: 'Asia/Taipei' });
+  $('date').textContent = d.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long', timeZone: 'Asia/Taipei' });
+}, 500);
+
+async function register() {
+  try {
+    const r = await api('register', { name: $('r-name').value, dept: $('r-dept').value });
+    if (r.first) toast('您是第一位註冊者，已設為管理員');
+    me = await api('me'); render();
+  } catch (e) { toast(e.message, true); }
+}
+
+function getPos() {
+  return new Promise((ok, fail) => {
+    if (!navigator.geolocation) return fail(new Error('此裝置不支援定位'));
+    navigator.geolocation.getCurrentPosition(ok, (err) => {
+      fail(new Error(err.code === 1 ? '定位權限被拒絕，請到手機設定允許 LINE 使用定位' : '無法取得定位，請到空曠處或開啟 GPS 後再試'));
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+  });
+}
+async function punch(type) {
+  busy(true);
+  try {
+    const pos = await getPos();
+    const r = await api('punch', { type: type, lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy });
+    me.punch = r.punch; renderPunch();
+    $('p-hint').textContent = type + '打卡成功 ' + r.time + '（距離公司 ' + r.distance + ' 公尺）';
+    toast(type + '打卡成功 ' + r.time.slice(0, 5));
+  } catch (e) { toast(e.message, true); $('p-hint').textContent = e.message; }
+  finally { busy(false); }
+}
+
+async function loadMonth() {
+  try {
+    const r = await api('myMonth', { month: $('m-month').value });
+    const s = r.summary;
+    $('m-sum').innerHTML = [['出勤天數', s.present], ['工時', s.workHours], ['遲到', s.late], ['早退', s.early], ['缺卡', s.missing], ['缺勤', s.absent], ['請假時數', s.leaveHours], ['加班時數', s.otHours]]
+      .map((x) => '<div><span class="mute">' + x[0] + '</span><b>' + x[1] + '</b></div>').join('');
+    $('m-body').innerHTML = r.days.slice().reverse().map((d) =>
+      '<tr class="' + (d.isWork ? '' : 'off') + '"><td>' + d.date.slice(5) + '（' + WD[d.wd] + '）</td><td>' + hm(d.in) + '</td><td>' + hm(d.out) + '</td><td>' +
+      (d.workMin ? (d.workMin / 60).toFixed(1) : '') + '</td><td>' + flagHtml(d.flags) + (d.leave ? esc(d.leave) : '') + (d.holiday ? esc(d.holiday) : '') + (d.ot ? ' 加班' + d.ot + 'h' : '') + '</td></tr>').join('') ||
+      '<tr><td colspan="5" class="mute">沒有資料</td></tr>';
+  } catch (e) { toast(e.message, true); }
+}
+
+function kindChange() {
+  const k = $('a-kind').value;
+  const opts = k === '補打卡' ? ['上班', '下班'] : k === '請假' ? me.leaveTypes : [];
+  $('a-sub').innerHTML = opts.map((o) => '<option>' + esc(o) + '</option>').join('');
+  $('a-sub').style.display = $('a-sub-l').style.display = opts.length ? 'block' : 'none';
+  $('a-sub-l').textContent = k === '補打卡' ? '補哪一筆' : '假別';
+  $('a-start-l').textContent = k === '補打卡' ? '打卡時間' : '開始時間';
+  $('a-range').style.display = k === '補打卡' ? 'none' : 'block';
+}
+async function apply() {
+  try {
+    await api('apply', { kind: $('a-kind').value, sub: $('a-sub').value, start: $('a-start').value, end: $('a-end').value, hours: $('a-hours').value, reason: $('a-reason').value });
+    toast('申請已送出');
+    $('a-reason').value = ''; $('a-start').value = ''; $('a-end').value = ''; $('a-hours').value = '';
+    loadApps();
+  } catch (e) { toast(e.message, true); }
+}
+async function loadApps() {
+  try {
+    const list = await api('myApps', {}, true);
+    $('a-list').innerHTML = list.map((a) => {
+      const cls = { '待審核': 'warn', '已核准': 'ok', '已駁回': 'bad' }[a.status] || '';
+      return '<div class="item"><span class="tag ' + cls + '">' + esc(a.status) + '</span><b>' + esc(a.kind) + (a.sub ? '・' + esc(a.sub) : '') + '</b><br>' +
+        '<span class="mute">' + esc(a.start) + (a.end ? ' ~ ' + esc(a.end) + '（' + esc(a.hours) + ' 小時）' : '') + '<br>事由：' + esc(a.reason) + (a.note ? '<br>審核備註：' + esc(a.note) : '') + '</span>' +
+        (a.status === '待審核' ? '<br><button class="btn sm ghost" onclick="cancelApp(\'' + esc(a.id) + '\')">取消申請</button>' : '') + '</div>';
+    }).join('') || '尚無申請';
+  } catch (e) { toast(e.message, true); }
+}
+async function cancelApp(id) {
+  try { await api('cancel', { id: id }); toast('已取消'); loadApps(); } catch (e) { toast(e.message, true); }
+}
+start();
+</script>
+</body>
+</html>

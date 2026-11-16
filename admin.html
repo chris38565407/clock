@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>打卡管理後台</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><h1 id="company">打卡管理後台</h1><small id="who"></small></header>
+<div id="v-msg"><main><div class="card center" id="msg">載入中…</div></main></div>
+
+<div id="v-main" style="display:none">
+  <nav class="tabs">
+    <button class="tab on" data-tab="today" onclick="showTab('today');loadToday()">今日出勤</button>
+    <button class="tab" data-tab="apps" onclick="showTab('apps');loadApps()">審核<span id="n-apps"></span></button>
+    <button class="tab" data-tab="emps" onclick="showTab('emps');loadEmps()">員工<span id="n-emps"></span></button>
+    <button class="tab" data-tab="report" onclick="showTab('report')">月報表</button>
+    <button class="tab" data-tab="set" onclick="showTab('set');loadSettings()">設定</button>
+  </nav>
+  <main>
+    <section class="page" id="p-today">
+      <div class="card"><div class="row"><input type="date" id="t-date" onchange="loadToday()"><button class="btn sm ghost" onclick="loadToday()">重新整理</button></div></div>
+      <div class="card scroll"><table><thead><tr><th>姓名</th><th>部門</th><th>上班</th><th>下班</th><th>狀態</th></tr></thead><tbody id="t-body"></tbody></table></div>
+    </section>
+
+    <section class="page" id="p-apps" style="display:none">
+      <div class="card"><select id="a-status" onchange="loadApps()"><option>待審核</option><option>已核准</option><option>已駁回</option><option>已取消</option><option>全部</option></select></div>
+      <div class="card" id="a-list"></div>
+    </section>
+
+    <section class="page" id="p-emps" style="display:none">
+      <div class="card scroll"><table><thead><tr><th>姓名</th><th>部門</th><th>角色</th><th>狀態</th><th></th></tr></thead><tbody id="e-body"></tbody></table></div>
+      <p class="mute">新員工在 LINE 開啟打卡頁註冊後會出現在這裡，把狀態改成「在職」並儲存即可開通。離職請改成「停用」。</p>
+    </section>
+
+    <section class="page" id="p-report" style="display:none">
+      <div class="card"><div class="row"><input type="month" id="r-month"><button class="btn sm" onclick="loadReport()">查詢</button><button class="btn sm ghost" onclick="exportCsv(false)">匯出總表</button><button class="btn sm ghost" onclick="exportCsv(true)">匯出明細</button></div></div>
+      <div class="card scroll"><table><thead><tr><th>姓名</th><th>部門</th><th>應出勤</th><th>實出勤</th><th>工時</th><th>遲到</th><th>早退</th><th>缺卡</th><th>缺勤</th><th>請假h</th><th>加班h</th><th></th></tr></thead><tbody id="r-body"><tr><td colspan="12" class="mute">請選擇月份後按查詢</td></tr></tbody></table></div>
+      <div class="card scroll" id="r-detail" style="display:none"></div>
+    </section>
+
+    <section class="page" id="p-set" style="display:none">
+      <div class="card"><h2>基本設定</h2><div id="s-form"></div>
+        <p></p><div class="row"><button class="btn sm ghost" onclick="useHere()">使用目前位置作為公司座標</button></div></div>
+      <div class="card"><h2>假日（不算上班日）</h2>
+        <p class="mute">一行一筆，格式：2027-01-01 元旦</p>
+        <textarea id="s-hol" rows="6"></textarea></div>
+      <div class="row"><button class="btn" onclick="saveSettings()">儲存設定</button></div><p></p>
+    </section>
+  </main>
+</div>
+
+<div id="busy">處理中…</div><div id="toast" class="toast"></div>
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script>
+let report = null;
+async function start() {
+  try {
+    if (!(await login())) return;
+    const me = await api('me', {}, true);
+    $('company').textContent = me.company + '・管理後台';
+    if (!me.registered || me.role !== '管理員' || me.status !== '在職') { $('msg').textContent = '此頁面僅限管理員使用。'; return; }
+    $('who').textContent = me.name;
+    $('t-date').value = me.today; $('r-month').value = me.today.slice(0, 7);
+    $('v-msg').style.display = 'none'; $('v-main').style.display = 'block';
+    loadToday();
+  } catch (e) { $('msg').textContent = '無法載入：' + e.message; }
+}
+
+async function loadToday() {
+  try {
+    const r = await api('adminToday', { date: $('t-date').value });
+    $('n-apps').textContent = r.pendingApps ? '(' + r.pendingApps + ')' : '';
+    $('n-emps').textContent = r.pendingEmps ? '(' + r.pendingEmps + ')' : '';
+    $('t-body').innerHTML = r.list.map((x) => '<tr><td>' + esc(x.name) + '</td><td>' + esc(x.dept) + '</td><td>' + hm(x.in) + '</td><td>' + hm(x.out) + '</td><td>' +
+      flagHtml(x.flags) + (x.leave ? esc(x.leave) : '') + (!x.in && !x.out && !x.flags.length ? '<span class="tag">未打卡</span>' : '') + '</td></tr>').join('') ||
+      '<tr><td colspan="5" class="mute">尚無在職員工</td></tr>';
+  } catch (e) { toast(e.message, true); }
+}
+
+async function loadApps() {
+  try {
+    const list = await api('adminApps', { status: $('a-status').value });
+    $('a-list').innerHTML = list.map((a) => {
+      const cls = { '待審核': 'warn', '已核准': 'ok', '已駁回': 'bad' }[a.status] || '';
+      return '<div class="item"><span class="tag ' + cls + '">' + esc(a.status) + '</span><b>' + esc(a.name) + '・' + esc(a.kind) + (a.sub ? '・' + esc(a.sub) : '') + '</b><br>' +
+        '<span class="mute">' + esc(a.start) + (a.end ? ' ~ ' + esc(a.end) + '（' + esc(a.hours) + ' 小時）' : '') + '<br>事由：' + esc(a.reason) + '<br>申請時間：' + esc(a.created) +
+        (a.note ? '<br>審核備註：' + esc(a.note) : '') + '</span>' +
+        (a.status === '待審核' ? '<div class="row" style="margin-top:8px"><input id="note-' + esc(a.id) + '" placeholder="審核備註（可不填）"><button class="btn sm" onclick="review(\'' + esc(a.id) + '\',true)">核准</button><button class="btn sm red" onclick="review(\'' + esc(a.id) + '\',false)">駁回</button></div>' : '') + '</div>';
+    }).join('') || '<span class="mute">沒有資料</span>';
+  } catch (e) { toast(e.message, true); }
+}
+async function review(id, approve) {
+  try {
+    await api('review', { id: id, approve: approve, note: $('note-' + id).value });
+    toast(approve ? '已核准' : '已駁回'); loadApps();
+  } catch (e) { toast(e.message, true); }
+}
+
+async function loadEmps() {
+  try {
+    const list = await api('adminEmps');
+    const sel = (opts, v, id) => '<select id="' + id + '">' + opts.map((o) => '<option' + (o === v ? ' selected' : '') + '>' + o + '</option>').join('') + '</select>';
+    $('e-body').innerHTML = list.map((e, i) => '<tr data-uid="' + esc(e.userId) + '"><td><input id="en-' + i + '" value="' + esc(e.name) + '" style="min-width:90px"></td><td><input id="ed-' + i + '" value="' + esc(e.dept) + '" style="min-width:80px"></td><td>' +
+      sel(['員工', '管理員'], e.role, 'er-' + i) + '</td><td>' + sel(['在職', '待審核', '停用'], e.status, 'es-' + i) + '</td><td><button class="btn sm" onclick="saveEmp(' + i + ',this)">儲存</button></td></tr>').join('') ||
+      '<tr><td colspan="5" class="mute">尚無員工</td></tr>';
+  } catch (e) { toast(e.message, true); }
+}
+async function saveEmp(i, btn) {
+  try {
+    await api('saveEmp', { userId: btn.closest('tr').dataset.uid, name: $('en-' + i).value, dept: $('ed-' + i).value, role: $('er-' + i).value, status: $('es-' + i).value });
+    toast('已儲存'); loadEmps();
+  } catch (e) { toast(e.message, true); }
+}
+
+async function loadReport() {
+  try {
+    report = await api('adminReport', { month: $('r-month').value });
+    $('r-detail').style.display = 'none';
+    $('r-body').innerHTML = report.employees.map((e, i) => {
+      const s = e.summary;
+      return '<tr><td>' + esc(e.name) + (e.status === '停用' ? ' <span class="tag">停用</span>' : '') + '</td><td>' + esc(e.dept) + '</td><td>' + s.workdays + '</td><td>' + s.present + '</td><td>' + s.workHours + '</td><td>' + s.late + '</td><td>' + s.early + '</td><td>' + s.missing + '</td><td>' + s.absent + '</td><td>' + s.leaveHours + '</td><td>' + s.otHours + '</td><td><button class="btn sm ghost" onclick="detail(' + i + ')">明細</button></td></tr>';
+    }).join('') || '<tr><td colspan="12" class="mute">沒有資料</td></tr>';
+  } catch (e) { toast(e.message, true); }
+}
+function detail(i) {
+  const e = report.employees[i];
+  $('r-detail').style.display = 'block';
+  $('r-detail').innerHTML = '<h2>' + esc(e.name) + '　' + esc(report.month) + ' 明細</h2><table><thead><tr><th>日期</th><th>上班</th><th>下班</th><th>工時</th><th>狀態</th></tr></thead><tbody>' +
+    e.days.map((d) => '<tr class="' + (d.isWork ? '' : 'off') + '"><td>' + d.date.slice(5) + '（' + WD[d.wd] + '）</td><td>' + hm(d.in) + '</td><td>' + hm(d.out) + '</td><td>' + (d.workMin ? (d.workMin / 60).toFixed(1) : '') + '</td><td>' +
+      flagHtml(d.flags) + (d.leave ? esc(d.leave) : '') + (d.holiday ? esc(d.holiday) : '') + (d.ot ? ' 加班' + d.ot + 'h' : '') + '</td></tr>').join('') + '</tbody></table>';
+  $('r-detail').scrollIntoView({ behavior: 'smooth' });
+}
+function exportCsv(withDetail) {
+  if (!report) { toast('請先按查詢', true); return; }
+  const q = (v) => '"' + String(v === null || v === undefined ? '' : v).replace(/"/g, '""') + '"';
+  let rows;
+  if (withDetail) {
+    rows = [['姓名', '部門', '日期', '星期', '上班', '下班', '工時', '狀態', '假別', '請假時數', '加班時數']];
+    report.employees.forEach((e) => e.days.forEach((d) => rows.push([e.name, e.dept, d.date, WD[d.wd], d.in, d.out, (d.workMin / 60).toFixed(2), d.flags.join('/'), d.leave, d.leaveHours, d.ot])));
+  } else {
+    rows = [['姓名', '部門', '應出勤天數', '實際出勤天數', '工時', '遲到', '早退', '缺卡', '缺勤', '請假時數', '加班時數']];
+    report.employees.forEach((e) => { const s = e.summary; rows.push([e.name, e.dept, s.workdays, s.present, s.workHours, s.late, s.early, s.missing, s.absent, s.leaveHours, s.otHours]); });
+  }
+  const csv = '﻿' + rows.map((r) => r.map(q).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = '出勤' + (withDetail ? '明細' : '總表') + '_' + report.month + '.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  if (window.liff && liff.isInClient()) toast('若在 LINE 內無法下載，請改用電腦瀏覽器開啟後台');
+}
+
+let setKeys = [];
+async function loadSettings() {
+  try {
+    const r = await api('getSettings');
+    setKeys = r.items.map((x) => x.key);
+    $('s-form').innerHTML = r.items.map((x, i) => '<label>' + esc(x.key) + (x.hint ? '　<span class="mute">' + esc(x.hint) + '</span>' : '') + '</label><input id="sv-' + i + '" value="' + esc(x.value) + '">').join('');
+    $('s-hol').value = r.holidays.map((h) => h.date + ' ' + h.name).join('\n');
+  } catch (e) { toast(e.message, true); }
+}
+function useHere() {
+  if (!navigator.geolocation) { toast('此裝置不支援定位', true); return; }
+  busy(true);
+  navigator.geolocation.getCurrentPosition((p) => {
+    busy(false);
+    $('sv-' + setKeys.indexOf('公司緯度')).value = p.coords.latitude.toFixed(6);
+    $('sv-' + setKeys.indexOf('公司經度')).value = p.coords.longitude.toFixed(6);
+    toast('已填入目前位置（誤差約 ' + Math.round(p.coords.accuracy) + ' 公尺），記得按儲存');
+  }, () => { busy(false); toast('無法取得定位', true); }, { enableHighAccuracy: true, timeout: 15000 });
+}
+async function saveSettings() {
+  const values = {};
+  setKeys.forEach((k, i) => { values[k] = $('sv-' + i).value; });
+  const holidays = $('s-hol').value.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => ({ date: l.slice(0, 10), name: l.slice(10).trim() }));
+  try { await api('saveSettings', { values: values, holidays: holidays }); toast('設定已儲存'); loadSettings(); } catch (e) { toast(e.message, true); }
+}
+start();
+</script>
+</body>
+</html>
