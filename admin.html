@@ -27,6 +27,16 @@
 .otd:first-child { border: 0; margin-top: 0; padding-top: 0; }
 .otr { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 14px; }
 .otr span { flex: 1; }
+.nt th, .nt td { text-align: center; }
+.nt th:first-child, .nt td:first-child { text-align: left; position: sticky; left: 0; background: #fff; z-index: 1; }
+.nt th:first-child { background: #fff; }
+.nt th { font-size: 12.5px; line-height: 1.35; vertical-align: bottom; }
+.nt th input, .nt td input { width: 20px; height: 20px; accent-color: var(--g); cursor: pointer; }
+.nt td.na { color: #c4cad1; }
+.nt tr.dirty td { background: #fffbe8; }
+.nt tr.dirty td:first-child { background: #fffbe8; }
+.legend { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 13.5px; margin: 6px 0 0; }
+.legend b { white-space: nowrap; }
 .sum { background: var(--bg); border-radius: 10px; padding: 10px 12px; margin-top: 12px; font-size: 14px; }
 </style>
 </head>
@@ -41,6 +51,7 @@
     <button class="tab" data-tab="ot" onclick="showTab('ot');otOpen()">加班登記</button>
     <button class="tab" data-admin data-tab="emps" onclick="showTab('emps');loadEmps()">員工<span id="n-emps"></span></button>
     <button class="tab" data-tab="report" onclick="showTab('report')">月報表</button>
+    <button class="tab" data-admin data-tab="notify" onclick="showTab('notify');loadNotify()">通知</button>
     <button class="tab" data-admin data-tab="set" onclick="showTab('set');loadSettings()">設定</button>
   </nav>
   <main>
@@ -98,6 +109,22 @@
       <div class="card"><div class="row"><input type="month" id="r-month"><button class="btn sm" onclick="loadReport()">查詢</button><button class="btn sm ghost" onclick="exportCsv(false)">匯出總表</button><button class="btn sm ghost" onclick="exportCsv(true)">匯出明細</button></div></div>
       <div class="card scroll"><table><thead><tr><th>姓名</th><th>部門</th><th>應出勤</th><th>實出勤</th><th>工時</th><th>遲到</th><th>早退</th><th>缺卡</th><th>缺勤</th><th>請假h</th><th>平日加班<br>前2h</th><th>平日加班<br>第3h起</th><th>週六加班<br>前2h</th><th>週六加班<br>第3h起</th><th>國定假日<br>加班</th><th>週日<br>加班</th><th>加班<br>合計</th><th></th></tr></thead><tbody id="r-body"><tr><td colspan="18" class="mute">請選擇月份後按查詢</td></tr></tbody></table></div>
       <div class="card scroll" id="r-detail" style="display:none"></div>
+    </section>
+
+    <section class="page" id="p-notify" style="display:none">
+      <div class="card">
+        <h2>通知對象</h2>
+        <p class="mute" style="margin:0 0 8px">勾選＝會收到這類 LINE 通知，取消勾選＝不發給這個人。每少發一則就省一則訊息額度。「—」代表這個角色本來就不會收到。</p>
+        <div class="row" style="margin-bottom:4px">
+          <button class="btn sm ghost" onclick="ntPreset('staffNoPunch')">後台人員不收打卡提醒</button>
+          <button class="btn sm ghost" onclick="ntPreset('all')">全部恢復為收到</button>
+        </div>
+        <div class="legend" id="nt-legend"></div>
+      </div>
+      <div class="card scroll"><table class="nt"><thead id="nt-head"></thead><tbody id="nt-body"><tr><td class="mute">載入中…</td></tr></tbody></table></div>
+      <p class="mute" style="margin:0 0 4px">手機畫面可以左右滑動表格，看到右邊的欄位。</p>
+      <p class="mute" id="nt-dirty"></p>
+      <div class="row"><button class="btn" onclick="saveNotify()">儲存通知設定</button></div><p></p>
     </section>
 
     <section class="page" id="p-set" style="display:none">
@@ -353,6 +380,62 @@ function exportCsv(withDetail) {
   a.download = '出勤' + (withDetail ? '明細' : '總表') + '_' + report.month + '.csv';
   document.body.appendChild(a); a.click(); a.remove();
   if (window.liff && liff.isInClient()) toast('若在 LINE 內無法下載，請改用電腦瀏覽器開啟後台');
+}
+
+/* ---------- 通知對象 ---------- */
+let nt = null;   // { types, emps, orig: {uid: 'k1,k2'} }
+async function loadNotify() {
+  try {
+    const r = await api('notifyGet');
+    nt = { types: r.types, emps: r.emps, orig: {} };
+    r.emps.forEach((e) => { nt.orig[e.userId] = e.off.slice().sort().join(','); });
+    $('nt-legend').innerHTML = r.types.map((t) => '<b>' + esc(t.name) + '</b><span class="mute">' + esc(t.desc) + '（' + esc(t.roles.length === 3 ? '所有人' : t.roles.join('、')) + '）</span>').join('');
+    renderNotify();
+  } catch (e) { toast(e.message, true); }
+}
+const ntApplies = (t, e) => t.roles.indexOf(e.role) >= 0;
+function renderNotify() {
+  $('nt-head').innerHTML = '<tr><th>姓名</th>' + nt.types.map((t, j) => {
+    const rows = nt.emps.filter((e) => ntApplies(t, e));
+    const allOn = rows.length && rows.every((e) => e.off.indexOf(t.key) < 0);
+    return '<th>' + esc(t.name) + '<br><input type="checkbox" title="整欄全選／全不選"' + (allOn ? ' checked' : '') + (rows.length ? '' : ' disabled') + ' onchange="ntCol(' + j + ',this.checked)"></th>';
+  }).join('') + '</tr>';
+  $('nt-body').innerHTML = nt.emps.map((e, i) => '<tr id="ntr-' + i + '"><td><b>' + esc(e.name) + '</b><br><span class="mute" style="font-size:12px">' + esc(e.role) + (e.dept ? '・' + esc(e.dept) : '') + '</span></td>' +
+    nt.types.map((t) => ntApplies(t, e)
+      ? '<td><input type="checkbox"' + (e.off.indexOf(t.key) < 0 ? ' checked' : '') + ' onchange="ntSet(' + i + ',\'' + t.key + '\',this.checked)"></td>'
+      : '<td class="na">—</td>').join('') + '</tr>').join('') || '<tr><td class="mute">尚無在職員工</td></tr>';
+  ntMarkDirty();
+}
+function ntSet(i, key, on) {
+  const e = nt.emps[i], k = e.off.indexOf(key);
+  if (on && k >= 0) e.off.splice(k, 1);
+  if (!on && k < 0) e.off.push(key);
+  renderNotify();
+}
+function ntCol(j, on) {
+  const t = nt.types[j];
+  nt.emps.forEach((e, i) => { if (ntApplies(t, e)) ntSet(i, t.key, on); });
+}
+function ntPreset(name) {
+  nt.emps.forEach((e) => {
+    if (name === 'all') e.off = [];
+    if (name === 'staffNoPunch' && e.role !== '員工') ['remIn', 'remOut'].forEach((k) => { if (e.off.indexOf(k) < 0) e.off.push(k); });
+  });
+  renderNotify();
+  toast(name === 'all' ? '已全部勾選，記得按儲存' : '已取消管理員與資料使用者的上下班提醒，記得按儲存');
+}
+function ntChanged() { return nt.emps.filter((e) => e.off.slice().sort().join(',') !== nt.orig[e.userId]); }
+function ntMarkDirty() {
+  const ch = ntChanged();
+  nt.emps.forEach((e, i) => { const tr = $('ntr-' + i); if (tr) tr.classList.toggle('dirty', ch.indexOf(e) >= 0); });
+  $('nt-dirty').textContent = ch.length ? '有 ' + ch.length + ' 人的設定尚未儲存（黃底）。' : '';
+}
+async function saveNotify() {
+  const ch = ntChanged();
+  if (!ch.length) { toast('沒有需要儲存的變更'); return; }
+  const changes = {};
+  ch.forEach((e) => { changes[e.userId] = e.off; });
+  try { const r = await api('notifySave', { changes: changes }); toast('已儲存 ' + r.saved + ' 人的通知設定'); loadNotify(); } catch (e) { toast(e.message, true); }
 }
 
 let setKeys = [];
