@@ -37,6 +37,15 @@
 .nt tr.dirty td:first-child { background: #fffbe8; }
 .legend { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 13.5px; margin: 6px 0 0; }
 .legend b { white-space: nowrap; }
+.banner { border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-size: 14px; line-height: 1.6; }
+.banner.bad { background: #fdecec; border: 1px solid #f3c2c2; color: #a52a2a; }
+.banner.warn { background: #fff5e0; border: 1px solid #f1d49a; color: #8a5a00; }
+.quota { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.quota .bar { flex: 1; height: 8px; border-radius: 99px; background: var(--bg); overflow: hidden; }
+.quota .bar i { display: block; height: 100%; background: var(--g); }
+.quota .bar i.warn { background: #e09a00; } .quota .bar i.bad { background: #d64545; }
+tr.over td { background: #fff3f3; }
+.chip.dis { opacity: .45; cursor: not-allowed; }
 .sum { background: var(--bg); border-radius: 10px; padding: 10px 12px; margin-top: 12px; font-size: 14px; }
 </style>
 </head>
@@ -56,12 +65,13 @@
   </nav>
   <main>
     <section class="page" id="p-today">
+      <div id="line-card"></div>
       <div class="card"><div class="row"><input type="date" id="t-date" onchange="loadToday()"><button class="btn sm ghost" onclick="loadToday()">重新整理</button></div></div>
       <div class="card scroll"><table><thead><tr><th>姓名</th><th>部門</th><th>上班</th><th>下班</th><th>狀態</th></tr></thead><tbody id="t-body"></tbody></table></div>
     </section>
 
     <section class="page" id="p-apps" style="display:none">
-      <div class="card"><select id="a-status" onchange="loadApps()"><option>待審核</option><option>已核准</option><option>已駁回</option><option>已取消</option><option>已作廢</option><option>全部</option></select></div>
+      <div class="card"><select id="a-status" onchange="loadApps()"><option>待審核</option><option>已核准</option><option>已駁回</option><option>已取消</option><option>已撤銷</option><option>已作廢</option><option>全部</option></select></div>
       <div class="card" id="a-list"></div>
     </section>
 
@@ -101,13 +111,15 @@
     </section>
 
     <section class="page" id="p-emps" style="display:none">
-      <div class="card scroll"><table><thead><tr><th>姓名</th><th>部門</th><th>角色</th><th>狀態</th><th></th></tr></thead><tbody id="e-body"></tbody></table></div>
-      <p class="mute">新員工在 LINE 開啟打卡頁註冊後會出現在這裡，把狀態改成「在職」並儲存即可開通。離職請改成「停用」。</p>
+      <div class="card scroll"><table><thead><tr><th>姓名</th><th>部門</th><th>角色</th><th>狀態</th><th>免打卡</th><th></th></tr></thead><tbody id="e-body"></tbody></table></div>
+      <p class="mute">新員工在 LINE 開啟打卡頁註冊後會出現在這裡，把狀態改成「在職」並儲存即可開通。離職請改成「停用」。<br>「免打卡」：勾選的人（例如老闆、外勤）不列入未到名單、不判定遲到早退缺勤，也不收打卡提醒；仍然可以自己打卡。</p>
     </section>
 
     <section class="page" id="p-report" style="display:none">
       <div class="card"><div class="row"><input type="month" id="r-month"><button class="btn sm" onclick="loadReport()">查詢</button><button class="btn sm ghost" onclick="exportCsv(false)">匯出總表</button><button class="btn sm ghost" onclick="exportCsv(true)">匯出明細</button></div></div>
-      <div class="card scroll"><table><thead><tr><th>姓名</th><th>部門</th><th>應出勤</th><th>實出勤</th><th>工時</th><th>遲到</th><th>早退</th><th>缺卡</th><th>缺勤</th><th>請假h</th><th>平日加班<br>前2h</th><th>平日加班<br>第3h起</th><th>週六加班<br>前2h</th><th>週六加班<br>第3h起</th><th>國定假日<br>加班</th><th>週日<br>加班</th><th>加班<br>合計</th><th></th></tr></thead><tbody id="r-body"><tr><td colspan="18" class="mute">請選擇月份後按查詢</td></tr></tbody></table></div>
+      <div id="r-warn"></div>
+      <div class="card scroll"><table><thead><tr><th>姓名</th><th>部門</th><th>應出勤</th><th>實出勤</th><th>正常<br>工時</th><th>在班<br>時數</th><th>遲到</th><th>早退</th><th>缺卡</th><th>缺勤</th><th>請假h</th><th>平日加班<br>前2h</th><th>平日加班<br>第3h起</th><th>週六加班<br>前2h</th><th>週六加班<br>第3h起</th><th>國定假日<br>加班</th><th>週日<br>加班</th><th>加班<br>合計</th><th>計入<br>上限</th><th></th></tr></thead><tbody id="r-body"><tr><td colspan="20" class="mute">請選擇月份後按查詢</td></tr></tbody></table></div>
+      <p class="mute" id="r-note" style="display:none">「正常工時」只算表定上下班時間內、扣除午休的時數；「在班時數」是從上班到下班扣除午休，包含加班的時間，兩者不要相加。「計入上限」是計入勞基法每月加班上限的時數（國定假日出勤 8 小時內不計入）。加班時數包含本月已安排、日期還沒到的加班。</p>
       <div class="card scroll" id="r-detail" style="display:none"></div>
     </section>
 
@@ -133,6 +145,7 @@
       <div class="card"><h2>假日（不算上班日）</h2>
         <p class="mute">一行一筆，格式：2027-01-01 元旦</p>
         <textarea id="s-hol" rows="6"></textarea></div>
+      <p class="mute" id="s-arc"></p>
       <div class="row"><button class="btn" onclick="saveSettings()">儲存設定</button></div><p></p>
     </section>
   </main>
@@ -155,8 +168,26 @@ async function start() {
     $('who').textContent = me.name + '（' + me.role + '）'; depts = me.depts || [];
     $('t-date').value = me.today; $('o-date').value = me.today; $('r-month').value = me.today.slice(0, 7);
     $('v-msg').style.display = 'none'; $('v-main').style.display = 'block';
-    loadToday();
+    loadToday(); loadLineStatus();
   } catch (e) { $('msg').textContent = '無法載入：' + e.message; }
+}
+
+// LINE 通知狀態：額度用量與最近一次發送失敗
+async function loadLineStatus() {
+  try {
+    const r = await api('lineStatus', {}, true);
+    let h = '';
+    if (!r.configured) h += '<div class="banner bad"><b>LINE 金鑰尚未設定</b>，所有通知都不會發出。請在試算表選單「打卡系統 → ② 設定 LINE 金鑰」設定。</div>';
+    if (r.error) h += '<div class="banner bad"><b>LINE 通知發送失敗</b>（' + esc(r.error.time) + '）<br>' + esc(r.error.msg) + '<br><span style="font-size:12.5px">下一次發送成功後，這則警示會自動消失。</span></div>';
+    if (r.quota) {
+      const pct = Math.min(100, Math.round((r.used || 0) / r.quota * 100)), cls = pct >= 100 ? 'bad' : pct >= 80 ? 'warn' : '';
+      h += '<div class="card"><div class="quota"><span>LINE 通知額度</span><span class="bar"><i class="' + cls + '" style="width:' + pct + '%"></i></span><b>' + (r.used === null ? '—' : r.used) + ' / ' + r.quota + ' 則</b></div>' +
+        (pct >= 80 ? '<p class="mute" style="margin:6px 0 0">本月額度' + (pct >= 100 ? '已用完，通知會停發到下個月 1 日' : '即將用完') + '。可到「通知」分頁減少發送對象，或升級 LINE 方案。</p>' : '') + '</div>';
+    } else if (r.unlimited) {
+      h += '<div class="card"><div class="quota"><span>LINE 通知額度</span><b>本月已用 ' + (r.used || 0) + ' 則（無上限方案）</b></div></div>';
+    }
+    $('line-card').innerHTML = h;
+  } catch (e) { /* 查不到額度不影響其他功能 */ }
 }
 
 async function loadToday() {
@@ -165,7 +196,8 @@ async function loadToday() {
     $('n-apps').textContent = r.pendingApps ? '(' + r.pendingApps + ')' : '';
     $('n-emps').textContent = r.pendingEmps ? '(' + r.pendingEmps + ')' : '';
     $('t-body').innerHTML = r.list.map((x) => '<tr><td>' + esc(x.name) + '</td><td>' + esc(x.dept) + '</td><td>' + hm(x.in) + '</td><td>' + hm(x.out) + '</td><td>' +
-      flagHtml(x.flags) + (x.leave ? esc(x.leave) : '') + (!x.in && !x.out && !x.flags.length ? '<span class="tag">未打卡</span>' : '') + '</td></tr>').join('') ||
+      flagHtml(x.flags) + (x.leave ? esc(x.leave) + (x.leaveTime && x.leaveTime !== '全天' ? ' ' + esc(x.leaveTime) : '') : '') +
+      (x.exempt ? '<span class="tag">免打卡</span>' : (!x.in && !x.out && !x.flags.length ? '<span class="tag">未打卡</span>' : '')) + '</td></tr>').join('') ||
       '<tr><td colspan="5" class="mute">尚無在職員工</td></tr>';
   } catch (e) { toast(e.message, true); }
 }
@@ -178,8 +210,16 @@ async function loadApps() {
       return '<div class="item"><span class="tag ' + cls + '">' + esc(a.status) + '</span><b>' + esc(a.name) + '・' + esc(a.kind) + (a.sub ? '・' + esc(a.sub) : '') + '</b><br>' +
         '<span class="mute">' + esc(a.start) + (a.end ? ' ~ ' + esc(a.end) : '') + (a.hours ? '（' + esc(a.hours) + ' 小時）' : '') + '<br>事由：' + esc(a.reason) + '<br>申請時間：' + esc(a.created) +
         (a.note ? '<br>審核備註：' + esc(a.note) : '') + '</span>' +
-        (a.status === '待審核' ? '<div class="row" style="margin-top:8px"><input id="note-' + esc(a.id) + '" placeholder="審核備註（可不填）"><button class="btn sm" onclick="review(\'' + esc(a.id) + '\',true)">核准</button><button class="btn sm red" onclick="review(\'' + esc(a.id) + '\',false)">駁回</button></div>' : '') + '</div>';
+        (a.status === '待審核' ? '<div class="row" style="margin-top:8px"><input id="note-' + esc(a.id) + '" placeholder="審核備註（可不填）"><button class="btn sm" onclick="review(\'' + esc(a.id) + '\',true)">核准</button><button class="btn sm red" onclick="review(\'' + esc(a.id) + '\',false)">駁回</button></div>' : '') +
+        (a.status === '已核准' ? '<div class="row" style="margin-top:8px"><input id="rv-' + esc(a.id) + '" placeholder="撤銷原因（會通知員工，可不填）"><button class="btn sm ghost" onclick="revoke(\'' + esc(a.id) + '\')">撤銷核准</button></div>' : '') + '</div>';
     }).join('') || '<span class="mute">沒有資料</span>';
+  } catch (e) { toast(e.message, true); }
+}
+async function revoke(id) {
+  if (!confirm('確定要撤銷這筆已核准的申請嗎？\n撤銷後不再計入報表；補打卡會一併刪除當初補上的打卡紀錄。')) return;
+  try {
+    const r = await api('revoke', { id: id, note: $('rv-' + id).value });
+    toast('已撤銷' + (r.removedPunch ? '，並刪除 ' + r.removedPunch + ' 筆補上的打卡' : '')); loadApps();
   } catch (e) { toast(e.message, true); }
 }
 async function review(id, approve) {
@@ -225,7 +265,10 @@ function otMonthMove(n) {
 function otRenderEmps() {
   const dept = $('ob-dept').value;
   const list = ot.data.emps.filter((e) => !dept || e.dept === dept);
-  $('ob-emps').innerHTML = list.map((e) => '<span class="chip' + (ot.emps.has(e.userId) ? ' on' : '') + '" data-uid="' + esc(e.userId) + '" onclick="otToggleEmp(this)">' + esc(e.name) + (dept ? '' : '<small>' + esc(e.dept) + '</small>') + '</span>').join('') ||
+  const selfLock = (e) => ot.data.myRole === '資料使用者' && e.userId === ot.data.myId;
+  $('ob-emps').innerHTML = list.map((e) => selfLock(e)
+    ? '<span class="chip dis" title="資料使用者不能登記自己的加班">' + esc(e.name) + '<small>本人</small></span>'
+    : '<span class="chip' + (ot.emps.has(e.userId) ? ' on' : '') + '" data-uid="' + esc(e.userId) + '" onclick="otToggleEmp(this)">' + esc(e.name) + (dept ? '' : '<small>' + esc(e.dept) + '</small>') + '</span>').join('') ||
     '<span class="mute">這個部門沒有在職員工</span>';
 }
 function otToggleEmp(el) {
@@ -235,7 +278,7 @@ function otToggleEmp(el) {
 }
 function otPickAll(on) {
   if (!on) ot.emps.clear();
-  else { const dept = $('ob-dept').value; ot.data.emps.filter((e) => !dept || e.dept === dept).forEach((e) => ot.emps.add(e.userId)); }
+  else { const dept = $('ob-dept').value; ot.data.emps.filter((e) => (!dept || e.dept === dept) && !(ot.data.myRole === '資料使用者' && e.userId === ot.data.myId)).forEach((e) => ot.emps.add(e.userId)); }
   otRenderEmps(); otSummary();
 }
 function otRenderCal() {
@@ -284,7 +327,12 @@ function otSummary() {
 async function otSubmit() {
   try {
     const days = Array.from(ot.days).sort();
-    const r = await api('otBatch', { userIds: Array.from(ot.emps), dates: days, start: $('ob-start').value, end: $('ob-end').value, hours: $('ob-hours').value, note: $('ob-note').value, notify: $('ob-notify').checked });
+    const req = { userIds: Array.from(ot.emps), dates: days, start: $('ob-start').value, end: $('ob-end').value, hours: $('ob-hours').value, note: $('ob-note').value, notify: $('ob-notify').checked };
+    let r = await api('otBatch', req);
+    if (r.needConfirm) {
+      if (!confirm(otWarnText(r.warnings))) return;
+      req.force = true; r = await api('otBatch', req);
+    }
     toast('已登記 ' + r.people + ' 人 × ' + r.days + ' 天的加班' + ($('ob-notify').checked ? '，並已發送通知' : ''));
     ot.days.clear(); $('ob-note').value = '';
     await otLoadMonth(); loadOt();
@@ -310,6 +358,11 @@ async function otCancel(btn) {
   } catch (e) { toast(e.message, true); }
 }
 
+function otWarnText(w) {
+  return '以下安排會超過勞基法的工時上限：\n\n' + w.slice(0, 12).map((x) => '・' + x).join('\n') + (w.length > 12 ? '\n…共 ' + w.length + ' 項' : '') +
+    '\n\n超過上限可能違反勞動基準法。仍要登記嗎？';
+}
+
 /* ---------- 單日核對 ---------- */
 async function loadOt() {
   try {
@@ -324,7 +377,12 @@ async function loadOt() {
 }
 async function saveOt(i, btn) {
   try {
-    await api('setOt', { userId: btn.closest('tr').dataset.uid, date: $('o-date').value, hours: $('oh-' + i).value || 0 });
+    const req = { userId: btn.closest('tr').dataset.uid, date: $('o-date').value, hours: $('oh-' + i).value || 0 };
+    const r = await api('setOt', req);
+    if (r && r.needConfirm) {
+      if (!confirm(otWarnText(r.warnings))) return;
+      req.force = true; await api('setOt', req);
+    }
     toast('加班時數已儲存'); loadOt(); otLoadMonth();
   } catch (e) { toast(e.message, true); }
 }
@@ -334,13 +392,13 @@ async function loadEmps() {
     const list = await api('adminEmps');
     const sel = (opts, v, id) => '<select id="' + id + '" style="min-width:90px">' + opts.map((o) => '<option value="' + esc(o) + '"' + (o === v ? ' selected' : '') + '>' + (esc(o) || '（未填）') + '</option>').join('') + '</select>';
     $('e-body').innerHTML = list.map((e, i) => '<tr data-uid="' + esc(e.userId) + '"><td><input id="en-' + i + '" value="' + esc(e.name) + '" style="min-width:90px"></td><td>' + sel(depts.indexOf(e.dept) >= 0 ? depts : [e.dept].concat(depts), e.dept, 'ed-' + i) + '</td><td>' +
-      sel(['員工', '資料使用者', '管理員'], e.role, 'er-' + i) + '</td><td>' + sel(['在職', '待審核', '停用'], e.status, 'es-' + i) + '</td><td><button class="btn sm" onclick="saveEmp(' + i + ',this)">儲存</button></td></tr>').join('') ||
-      '<tr><td colspan="5" class="mute">尚無員工</td></tr>';
+      sel(['員工', '資料使用者', '管理員'], e.role, 'er-' + i) + '</td><td>' + sel(['在職', '待審核', '停用'], e.status, 'es-' + i) + '</td><td style="text-align:center"><input type="checkbox" id="ex-' + i + '"' + (e.exempt ? ' checked' : '') + ' style="width:20px;height:20px;accent-color:var(--g)"></td><td><button class="btn sm" onclick="saveEmp(' + i + ',this)">儲存</button></td></tr>').join('') ||
+      '<tr><td colspan="6" class="mute">尚無員工</td></tr>';
   } catch (e) { toast(e.message, true); }
 }
 async function saveEmp(i, btn) {
   try {
-    await api('saveEmp', { userId: btn.closest('tr').dataset.uid, name: $('en-' + i).value, dept: $('ed-' + i).value, role: $('er-' + i).value, status: $('es-' + i).value });
+    await api('saveEmp', { userId: btn.closest('tr').dataset.uid, name: $('en-' + i).value, dept: $('ed-' + i).value, role: $('er-' + i).value, status: $('es-' + i).value, exempt: $('ex-' + i).checked });
     toast('已儲存'); loadEmps();
   } catch (e) { toast(e.message, true); }
 }
@@ -350,29 +408,35 @@ async function loadReport() {
     report = await api('adminReport', { month: $('r-month').value });
     $('r-detail').style.display = 'none';
     $('r-body').innerHTML = report.employees.map((e, i) => {
-      const s = e.summary;
-      return '<tr><td>' + esc(e.name) + (e.status === '停用' ? ' <span class="tag">停用</span>' : '') + '</td><td>' + esc(e.dept) + '</td><td>' + s.workdays + '</td><td>' + s.present + '</td><td>' + s.workHours + '</td><td>' + s.late + '</td><td>' + s.early + '</td><td>' + s.missing + '</td><td>' + s.absent + '</td><td>' + s.leaveHours + '</td><td>' + s.otWk1 + '</td><td>' + s.otWk2 + '</td><td>' + s.otSat1 + '</td><td>' + s.otSat2 + '</td><td>' + s.otHol + '</td><td>' + s.otSun + '</td><td>' + s.otHours + '</td><td><button class="btn sm ghost" onclick="detail(' + i + ')">明細</button></td></tr>';
-    }).join('') || '<tr><td colspan="18" class="mute">沒有資料</td></tr>';
+      const s = e.summary, over = e.warn.length;
+      return '<tr class="' + (over ? 'over' : '') + '"><td>' + esc(e.name) + (e.status === '停用' ? ' <span class="tag">停用</span>' : '') + (e.exempt ? ' <span class="tag">免打卡</span>' : '') + (over ? ' <span class="tag bad">超過上限</span>' : '') + '</td><td>' + esc(e.dept) + '</td><td>' + s.workdays + '</td><td>' + s.present + '</td><td>' + s.workHours + '</td><td>' + s.stayHours + '</td><td>' + s.late + '</td><td>' + s.early + '</td><td>' + s.missing + '</td><td>' + s.absent + '</td><td>' + s.leaveHours + '</td><td>' + s.otWk1 + '</td><td>' + s.otWk2 + '</td><td>' + s.otSat1 + '</td><td>' + s.otSat2 + '</td><td>' + s.otHol + '</td><td>' + s.otSun + '</td><td>' + s.otHours + '</td><td>' + s.otLegal + '</td><td><button class="btn sm ghost" onclick="detail(' + i + ')">明細</button></td></tr>';
+    }).join('') || '<tr><td colspan="20" class="mute">沒有資料</td></tr>';
+    const ws = [];
+    report.employees.forEach((e) => e.warn.forEach((w) => ws.push(e.name + '：' + w)));
+    $('r-warn').innerHTML = ws.length ? '<div class="banner bad"><b>加班超過勞基法上限（' + ws.length + ' 項）</b><br>' + ws.map(esc).join('<br>') +
+      '<br><span style="font-size:12.5px">目前上限：每月 ' + report.limitMonth + ' 小時' + (report.limit3 ? '、連續 3 個月 ' + report.limit3 + ' 小時' : '') + '、每日正常工時加加班 12 小時。</span></div>' : '';
+    $('r-note').style.display = 'block';
   } catch (e) { toast(e.message, true); }
 }
 function detail(i) {
   const e = report.employees[i];
   $('r-detail').style.display = 'block';
-  $('r-detail').innerHTML = '<h2>' + esc(e.name) + '　' + esc(report.month) + ' 明細</h2><table><thead><tr><th>日期</th><th>上班</th><th>下班</th><th>工時</th><th>狀態</th></tr></thead><tbody>' +
-    e.days.map((d) => '<tr class="' + (d.isWork ? '' : 'off') + '"><td>' + d.date.slice(5) + '（' + WD[d.wd] + '）</td><td>' + hm(d.in) + '</td><td>' + hm(d.out) + '</td><td>' + (d.workMin ? (d.workMin / 60).toFixed(1) : '') + '</td><td>' +
-      flagHtml(d.flags) + (d.leave ? esc(d.leave) : '') + (d.holiday ? esc(d.holiday) : '') + (d.ot ? ' ' + esc(d.otType) + '加班' + d.ot + 'h' : '') + '</td></tr>').join('') + '</tbody></table>';
+  $('r-detail').innerHTML = '<h2>' + esc(e.name) + '　' + esc(report.month) + ' 明細</h2><table><thead><tr><th>日期</th><th>上班</th><th>下班</th><th>正常工時</th><th>在班時數</th><th>狀態</th></tr></thead><tbody>' +
+    e.days.map((d) => '<tr class="' + (d.isWork ? '' : 'off') + '"><td>' + d.date.slice(5) + '（' + WD[d.wd] + '）</td><td>' + hm(d.in) + '</td><td>' + hm(d.out) + '</td><td>' + (d.workMin ? (d.workMin / 60).toFixed(1) : '') + '</td><td>' + (d.stayMin ? (d.stayMin / 60).toFixed(1) : '') + '</td><td>' +
+      flagHtml(d.flags) + (d.leave ? esc(d.leave) + (d.leaveTime && d.leaveTime !== '全天' ? ' ' + esc(d.leaveTime) : '') : '') + (d.holiday ? esc(d.holiday) : '') + (d.ot ? ' ' + esc(d.otType) + '加班' + d.ot + 'h' : '') + '</td></tr>').join('') + '</tbody></table>';
   $('r-detail').scrollIntoView({ behavior: 'smooth' });
 }
 function exportCsv(withDetail) {
   if (!report) { toast('請先按查詢', true); return; }
-  const q = (v) => '"' + String(v === null || v === undefined ? '' : v).replace(/"/g, '""') + '"';
+  // 文字開頭是 = + - @ 時加上單引號，避免 Excel 把員工填的內容當成公式執行
+  const q = (v) => { let x = String(v === null || v === undefined ? '' : v); if (/^[=+\-@\t\r]/.test(x) && isNaN(Number(x))) x = "'" + x; return '"' + x.replace(/"/g, '""') + '"'; };
   let rows;
   if (withDetail) {
-    rows = [['姓名', '部門', '日期', '星期', '上班', '下班', '工時', '狀態', '假別', '請假時數', '加班類別', '加班時數']];
-    report.employees.forEach((e) => e.days.forEach((d) => rows.push([e.name, e.dept, d.date, WD[d.wd], d.in, d.out, (d.workMin / 60).toFixed(2), d.flags.join('/'), d.leave, d.leaveHours, d.otType, d.ot])));
+    rows = [['姓名', '部門', '日期', '星期', '上班', '下班', '正常工時', '在班時數', '狀態', '假別', '請假時段', '請假時數', '加班類別', '加班時數']];
+    report.employees.forEach((e) => e.days.forEach((d) => rows.push([e.name, e.dept, d.date, WD[d.wd], d.in, d.out, (d.workMin / 60).toFixed(2), (d.stayMin / 60).toFixed(2), d.flags.join('/'), d.leave, d.leaveTime, d.leaveHours, d.otType, d.ot])));
   } else {
-    rows = [['姓名', '部門', '應出勤天數', '實際出勤天數', '工時', '遲到', '早退', '缺卡', '缺勤', '請假時數', '平日加班-前2小時', '平日加班-第3小時起', '週六加班-前2小時', '週六加班-第3小時起', '國定假日加班', '週日加班', '加班合計']];
-    report.employees.forEach((e) => { const s = e.summary; rows.push([e.name, e.dept, s.workdays, s.present, s.workHours, s.late, s.early, s.missing, s.absent, s.leaveHours, s.otWk1, s.otWk2, s.otSat1, s.otSat2, s.otHol, s.otSun, s.otHours]); });
+    rows = [['姓名', '部門', '應出勤天數', '實際出勤天數', '正常工時', '在班時數', '遲到', '早退', '缺卡', '缺勤', '請假時數', '平日加班-前2小時', '平日加班-第3小時起', '週六加班-前2小時', '週六加班-第3小時起', '國定假日加班', '週日加班', '加班合計', '計入上限加班', '近3個月計入上限加班', '單日超過12小時天數', '上限警示']];
+    report.employees.forEach((e) => { const s = e.summary; rows.push([e.name, e.dept, s.workdays, s.present, s.workHours, s.stayHours, s.late, s.early, s.missing, s.absent, s.leaveHours, s.otWk1, s.otWk2, s.otSat1, s.otSat2, s.otHol, s.otSun, s.otHours, s.otLegal, s.otLegal3, s.dayOver12, e.warn.join('；')]); });
   }
   const csv = '﻿' + rows.map((r) => r.map(q).join(',')).join('\r\n');
   const a = document.createElement('a');
@@ -445,6 +509,7 @@ async function loadSettings() {
     setKeys = r.items.map((x) => x.key);
     $('s-form').innerHTML = r.items.map((x, i) => '<label>' + esc(x.key) + (x.hint ? '　<span class="mute">' + esc(x.hint) + '</span>' : '') + '</label><input id="sv-' + i + '" value="' + esc(x.value) + '">').join('');
     $('s-hol').value = r.holidays.map((h) => h.date + ' ' + h.name).join('\n');
+    $('s-arc').textContent = r.archiveBefore ? '資料封存：' + r.archiveBefore + ' 以前的打卡與申請已移到「_封存」工作表（每月 1 日自動執行），月報表仍可查詢。' : '資料封存：系統每月 1 日凌晨會把 12 個月以前的資料移到「_封存」工作表，目前尚未有資料被封存。';
   } catch (e) { toast(e.message, true); }
 }
 function useHere() {

@@ -53,6 +53,10 @@ header .ttl { flex: 1; min-width: 0; }
         </div>
         <p class="mute center" id="p-hint"></p>
       </div>
+      <div class="card" id="up-card" style="display:none">
+        <h2 data-t="upTitle"></h2>
+        <div id="up-list"></div>
+      </div>
     </section>
 
     <section class="page" id="p-rec" style="display:none">
@@ -101,8 +105,9 @@ const I18N = {
     punchOk: '{0}打卡成功 {1}（距離公司 {2} 公尺）', punchToast: '{0}打卡成功 {1}',
     geoNone: '此裝置不支援定位', geoDenied: '定位權限被拒絕，請到手機設定允許 LINE 使用定位', geoFail: '無法取得定位，請到空曠處或開啟 GPS 後再試',
     thDate: '日期', thHours: '工時', thStatus: '狀態', noData: '沒有資料',
-    sPresent: '出勤天數', sHours: '工時', sLate: '遲到', sEarly: '早退', sMissing: '缺卡', sAbsent: '缺勤', sLeave: '請假時數', sOt: '加班時數',
+    sPresent: '出勤天數', sHours: '正常工時', sLate: '遲到', sEarly: '早退', sMissing: '缺卡', sAbsent: '缺勤', sLeave: '請假時數', sOt: '加班時數',
     otDay: '加班 {0} 小時',
+    upTitle: '近期加班安排', upItem: '{0}　{1}（{2} 小時）', busyMsg: '目前使用人數較多，請稍候再按一次', netMsg: '網路連線不穩，請稍後再試',
     newApp: '新增申請', kind: '類別', whichPunch: '補哪一筆', leaveType: '假別', punchTime: '打卡時間', startTime: '開始時間', endTime: '結束時間',
     hoursLabel: '時數（小時）', reason: '事由', submitApp: '送出申請', myApps: '我的申請', appSent: '申請已送出', noApps: '尚無申請',
     hoursUnit: '（{0} 小時）', reasonPre: '事由：', notePre: '審核備註：', cancelApp: '取消申請', cancelled: '已取消',
@@ -120,8 +125,9 @@ const I18N = {
     punchOk: 'Chấm công {0} thành công lúc {1} (cách công ty {2} mét)', punchToast: 'Chấm công {0} thành công {1}',
     geoNone: 'Thiết bị này không hỗ trợ định vị', geoDenied: 'Quyền định vị bị từ chối. Vui lòng vào cài đặt điện thoại và cho phép LINE sử dụng vị trí', geoFail: 'Không lấy được vị trí. Vui lòng ra nơi thoáng hoặc bật GPS rồi thử lại',
     thDate: 'Ngày', thHours: 'Giờ làm', thStatus: 'Trạng thái', noData: 'Không có dữ liệu',
-    sPresent: 'Ngày đi làm', sHours: 'Giờ làm', sLate: 'Đi trễ', sEarly: 'Về sớm', sMissing: 'Thiếu chấm công', sAbsent: 'Vắng mặt', sLeave: 'Giờ nghỉ phép', sOt: 'Giờ tăng ca',
+    sPresent: 'Ngày đi làm', sHours: 'Giờ làm chính thức', sLate: 'Đi trễ', sEarly: 'Về sớm', sMissing: 'Thiếu chấm công', sAbsent: 'Vắng mặt', sLeave: 'Giờ nghỉ phép', sOt: 'Giờ tăng ca',
     otDay: 'Tăng ca {0} giờ',
+    upTitle: 'Lịch tăng ca sắp tới', upItem: '{0}  {1} ({2} giờ)', busyMsg: 'Hiện có nhiều người đang sử dụng, vui lòng đợi một chút rồi bấm lại', netMsg: 'Kết nối mạng không ổn định, vui lòng thử lại sau',
     newApp: 'Tạo đơn mới', kind: 'Loại đơn', whichPunch: 'Bổ sung lần nào', leaveType: 'Loại nghỉ phép', punchTime: 'Thời gian chấm công', startTime: 'Thời gian bắt đầu', endTime: 'Thời gian kết thúc',
     hoursLabel: 'Số giờ', reason: 'Lý do', submitApp: 'Gửi đơn', myApps: 'Đơn của tôi', appSent: 'Đã gửi đơn', noApps: 'Chưa có đơn nào',
     hoursUnit: ' ({0} giờ)', reasonPre: 'Lý do: ', notePre: 'Ghi chú duyệt: ', cancelApp: 'Hủy đơn', cancelled: 'Đã hủy',
@@ -133,7 +139,7 @@ const VI_TERMS = {
   '上班': 'vào', '下班': 'ra',
   '補打卡': 'Bổ sung chấm công', '請假': 'Nghỉ phép', '加班': 'Tăng ca',
   '遲到': 'Đi trễ', '早退': 'Về sớm', '缺卡': 'Thiếu chấm công', '缺勤': 'Vắng mặt', '補卡': 'Chấm bù',
-  '待審核': 'Chờ duyệt', '已核准': 'Đã duyệt', '已駁回': 'Bị từ chối', '已取消': 'Đã hủy', '已作廢': 'Đã vô hiệu', '停用': 'Ngừng sử dụng',
+  '待審核': 'Chờ duyệt', '已核准': 'Đã duyệt', '已駁回': 'Bị từ chối', '已取消': 'Đã hủy', '已作廢': 'Đã vô hiệu', '已撤銷': 'Đã thu hồi', '停用': 'Ngừng sử dụng',
   '特休': 'Nghỉ phép năm', '事假': 'Nghỉ việc riêng', '病假': 'Nghỉ ốm', '公假': 'Nghỉ công vụ', '婚假': 'Nghỉ kết hôn', '喪假': 'Nghỉ tang', '其他': 'Khác',
   '管理部': 'Bộ phận Quản lý', '業務部': 'Bộ phận Kinh doanh', '會計部': 'Bộ phận Kế toán', '製造部': 'Bộ phận Sản xuất', '包裝部': 'Bộ phận Đóng gói', '物流部': 'Bộ phận Hậu cần',
   '公司安排加班': 'Công ty sắp xếp tăng ca', '管理人員登記': 'Quản lý đăng ký',
@@ -148,6 +154,7 @@ function applyLang() {
   document.documentElement.lang = LANG === 'vi' ? 'vi' : 'zh-Hant';
   document.title = t('title'); $('lang').value = LANG; $('busy').textContent = t('busy');
   document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.dataset.t); });
+  window.BUSY_MSG = t('busyMsg'); window.NET_MSG = t('netMsg');
 }
 function storedLang() { try { return localStorage.getItem('lang'); } catch (e) { return null; } }
 async function setLang(l, byUser) {
@@ -205,7 +212,14 @@ function render(first) {
 function renderPunch() {
   $('t-in').textContent = hm(me.punch.in); $('t-out').textContent = hm(me.punch.out);
   $('b-in').disabled = !!me.punch.in;
+  const up = me.upcomingOt || [];
+  $('up-card').style.display = up.length ? 'block' : 'none';
+  $('up-list').innerHTML = up.map((x) => {
+    const d = (LANG === 'vi' ? +x.date.slice(8) + '/' + +x.date.slice(5, 7) : +x.date.slice(5, 7) + '/' + +x.date.slice(8)) + t('wdFmt', I18N[LANG].wd[wdOf(x.date)]);
+    return '<div class="item">' + esc(t('upItem', d, x.end ? x.start + '–' + x.end : '', x.hours)) + (x.note ? '<br><span class="mute">' + esc(term(x.note)) + '</span>' : '') + '</div>';
+  }).join('');
 }
+function wdOf(d) { const a = d.split('-'); const w = new Date(+a[0], +a[1] - 1, +a[2]).getDay(); return w === 0 ? 7 : w; }
 setInterval(() => {
   const d = new Date();
   $('clock').textContent = d.toLocaleTimeString('zh-TW', { hour12: false, timeZone: 'Asia/Taipei' });
@@ -253,7 +267,7 @@ async function loadMonth() {
       .map((x) => '<div><span class="mute">' + esc(t(x[0])) + '</span><b>' + x[1] + '</b></div>').join('');
     $('m-body').innerHTML = r.days.slice().reverse().map((d) =>
       '<tr class="' + (d.isWork ? '' : 'off') + '"><td>' + d.date.slice(5) + esc(t('wdFmt', I18N[LANG].wd[d.wd])) + '</td><td>' + hm(d.in) + '</td><td>' + hm(d.out) + '</td><td>' +
-      (d.workMin ? (d.workMin / 60).toFixed(1) : '') + '</td><td>' + dayTags(d.flags) + (d.leave ? esc(termBoth(d.leave)) : '') + (d.holiday ? esc(d.holiday) : '') + (d.ot ? ' ' + esc(t('otDay', d.ot)) : '') + '</td></tr>').join('') ||
+      (d.workMin ? (d.workMin / 60).toFixed(1) : '') + '</td><td>' + dayTags(d.flags) + (d.leave ? esc(termBoth(d.leave)) + (d.leaveTime && d.leaveTime !== '全天' ? ' ' + esc(d.leaveTime) : '') : '') + (d.holiday ? esc(d.holiday) : '') + (d.ot ? ' ' + esc(t('otDay', d.ot)) : '') + '</td></tr>').join('') ||
       '<tr><td colspan="5" class="mute">' + esc(t('noData')) + '</td></tr>';
   } catch (e) { toast(e.message, true); }
 }

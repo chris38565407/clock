@@ -26,20 +26,33 @@ function relogin() {
   if (liff.isInClient()) location.reload(); else liff.login({ redirectUri: location.href });
 }
 
+// 只讀取資料的操作，網路斷線時可以安全地自動重試（寫入的操作不自動重試，避免重複送出）
+const READ_ONLY = ['me', 'myMonth', 'myApps', 'adminToday', 'lineStatus', 'adminApps', 'otDay', 'otMonth', 'notifyGet', 'adminEmps', 'adminReport', 'getSettings'];
+// 呼叫後端。系統忙碌（多人同時操作）時會自動等一下再重試，最多 3 次
 async function api(action, data, quiet) {
   if (!quiet) busy(true);
   try {
-    const res = await fetch(window.APP_CONFIG.API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(Object.assign({ action: action, idToken: idToken }, data || {}))
-    });
-    const j = await res.json();
-    if (!j.ok) {
+    for (let attempt = 0; ; attempt++) {
+      let j;
+      try {
+        const res = await fetch(window.APP_CONFIG.API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(Object.assign({ action: action, idToken: idToken }, data || {}))
+        });
+        j = await res.json();
+      } catch (e) {
+        if (attempt < 2 && READ_ONLY.indexOf(action) >= 0) { await new Promise((r) => setTimeout(r, 1500)); continue; }
+        throw new Error(window.NET_MSG || '網路連線不穩，請稍後再試');
+      }
+      if (j.ok) return j.data;
       if (j.error === 'AUTH') { relogin(); throw new Error('登入已過期，重新登入中…'); }
+      if (j.error === 'BUSY') {
+        if (attempt < 3) { await new Promise((r) => setTimeout(r, 1200 + Math.random() * 1500)); continue; }
+        throw new Error(window.BUSY_MSG || '目前使用人數較多，請稍候再按一次');
+      }
       throw new Error(j.error || '發生錯誤');
     }
-    return j.data;
   } finally { if (!quiet) busy(false); }
 }
 
