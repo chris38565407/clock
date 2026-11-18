@@ -46,6 +46,26 @@
 .quota .bar i.warn { background: #e09a00; } .quota .bar i.bad { background: #d64545; }
 tr.over td { background: #fff3f3; }
 .chip.dis { opacity: .45; cursor: not-allowed; }
+main { max-width: 1280px; }
+.pay th, .pay td { text-align: right; padding: 6px 7px; font-variant-numeric: tabular-nums; }
+.pay th { text-align: center; }
+.pay td:first-child, .pay th:first-child { text-align: left; position: sticky; left: 0; background: #fff; z-index: 1; }
+.pay tbody tr { cursor: pointer; }
+.pay tbody tr:hover td { background: #f3faf6; }
+.pay tbody tr.sel td { background: #e6f7ed; }
+.pay tr.tot td { font-weight: 700; border-top: 2px solid var(--ink); cursor: default; background: #fff; }
+.pay td.net { font-weight: 700; color: var(--gd); }
+.pay .grp { background: #e9f6ee; color: var(--gd); }
+.cfg th, .cfg td { padding: 4px 4px; }
+.cfg input, .cfg select { padding: 6px; font-size: 14px; min-width: 70px; }
+.cfg select { min-width: 104px; }
+#r-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 0 16px; }
+#r-form label { min-height: 2.6em; }
+.cfg td:first-child { position: sticky; left: 0; background: #fff; z-index: 1; white-space: nowrap; }
+details.card > summary { cursor: pointer; font-weight: 700; font-size: 16px; }
+.kv { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 12px; font-size: 14px; }
+.kv b { text-align: right; font-variant-numeric: tabular-nums; }
+.kv span:nth-child(3n+2) { color: var(--mute); }
 .sum { background: var(--bg); border-radius: 10px; padding: 10px 12px; margin-top: 12px; font-size: 14px; }
 </style>
 </head>
@@ -61,6 +81,7 @@ tr.over td { background: #fff3f3; }
     <button class="tab" data-admin data-tab="emps" onclick="showTab('emps');loadEmps()">員工<span id="n-emps"></span></button>
     <button class="tab" data-tab="report" onclick="showTab('report')">月報表</button>
     <button class="tab" data-admin data-tab="notify" onclick="showTab('notify');loadNotify()">通知</button>
+    <button class="tab" data-payroll data-tab="pay" onclick="showTab('pay');payOpen()">薪資</button>
     <button class="tab" data-admin data-tab="set" onclick="showTab('set');loadSettings()">設定</button>
   </nav>
   <main>
@@ -73,6 +94,18 @@ tr.over td { background: #fff3f3; }
     <section class="page" id="p-apps" style="display:none">
       <div class="card"><select id="a-status" onchange="loadApps()"><option>待審核</option><option>已核准</option><option>已駁回</option><option>已取消</option><option>已撤銷</option><option>已作廢</option><option>全部</option></select></div>
       <div class="card" id="a-list"></div>
+      <details class="card" ontoggle="if(this.open)alOpen()">
+        <summary>代員工登記請假</summary>
+        <p class="mute" style="margin:8px 0">例如颱風天公司統一停班，可以一次替多位員工登記特休或無薪假，登記後直接核准，不會發通知。</p>
+        <label>員工（點選可複選）</label>
+        <div class="row" style="margin-bottom:6px"><button class="btn sm ghost" onclick="alAll(true)">全選</button><button class="btn sm ghost" onclick="alAll(false)">全部清除</button></div>
+        <div id="al-emps" class="chips"></div>
+        <label>假別</label><select id="al-sub"></select>
+        <div class="row"><div><label>開始</label><input type="datetime-local" id="al-start"></div><div><label>結束</label><input type="datetime-local" id="al-end"></div></div>
+        <label>每人請假時數</label><input type="number" id="al-hours" min="0.5" step="0.5" inputmode="decimal">
+        <label>事由（可不填）</label><input id="al-reason" maxlength="200" placeholder="例如：颱風停班">
+        <p></p><div class="row"><button class="btn" onclick="alSubmit()">登記請假</button></div>
+      </details>
     </section>
 
     <section class="page" id="p-ot" style="display:none">
@@ -111,8 +144,8 @@ tr.over td { background: #fff3f3; }
     </section>
 
     <section class="page" id="p-emps" style="display:none">
-      <div class="card scroll"><table><thead><tr><th>姓名</th><th>部門</th><th>角色</th><th>狀態</th><th>免打卡</th><th></th></tr></thead><tbody id="e-body"></tbody></table></div>
-      <p class="mute">新員工在 LINE 開啟打卡頁註冊後會出現在這裡，把狀態改成「在職」並儲存即可開通。離職請改成「停用」。<br>「免打卡」：勾選的人（例如老闆、外勤）不列入未到名單、不判定遲到早退缺勤，也不收打卡提醒；仍然可以自己打卡。</p>
+      <div class="card scroll"><table><thead><tr><th>姓名</th><th>部門</th><th>角色</th><th>狀態</th><th>免打卡</th><th>薪資<br>權限</th><th></th></tr></thead><tbody id="e-body"></tbody></table></div>
+      <p class="mute">新員工在 LINE 開啟打卡頁註冊後會出現在這裡，把狀態改成「在職」並儲存即可開通。離職請改成「停用」。<br>「免打卡」：勾選的人（例如老闆、外勤）不列入未到名單、不判定遲到早退缺勤，也不收打卡提醒；仍然可以自己打卡。<br>「薪資權限」：勾選的人才看得到「薪資」分頁（建議只給老闆與會計）。只有已經有薪資權限的人可以變更別人的薪資權限。</p>
     </section>
 
     <section class="page" id="p-report" style="display:none">
@@ -139,6 +172,43 @@ tr.over td { background: #fff3f3; }
       <div class="row"><button class="btn" onclick="saveNotify()">儲存通知設定</button></div><p></p>
     </section>
 
+    <section class="page" id="p-pay" style="display:none">
+      <div class="card">
+        <div class="row">
+          <input type="month" id="p-month" onchange="payLoad()">
+          <button class="btn sm" onclick="payLoad()">計算</button>
+          <button class="btn sm ghost" onclick="payPrint()">列印薪資表</button>
+          <button class="btn sm ghost" onclick="payCsv()">匯出 Excel</button>
+          <button class="btn sm" id="p-lockbtn" onclick="payToggleLock()">確認本月薪資</button>
+        </div>
+        <p class="mute" id="p-status" style="margin:8px 0 0"></p>
+      </div>
+      <div id="p-warn"></div>
+      <div class="card scroll"><table class="pay"><thead>
+        <tr><th rowspan="2">姓名</th><th colspan="7" class="grp">應領金額</th><th rowspan="2">合計</th><th colspan="5" class="grp">應扣金額</th><th rowspan="2">實領金額</th></tr>
+        <tr><th>本薪</th><th>全勤</th><th>加班費</th><th>伙食費</th><th>工作獎金</th><th>租金</th><th>其他加項</th><th>健保</th><th>勞保</th><th>自提</th><th>請假</th><th>其他減項</th></tr>
+      </thead><tbody id="p-body"><tr><td colspan="15" class="mute">載入中…</td></tr></tbody></table></div>
+      <p class="mute">點任一列可以看計算明細，並輸入當月的補貼加班時數、其他加減項與備註。</p>
+      <div class="card" id="p-detail" style="display:none"></div>
+
+      <details class="card" id="p-cfgbox">
+        <summary>員工薪資設定</summary>
+        <p class="mute" style="margin:8px 0">固定金額填一次，之後每月沿用。空白視為 0。加班方式選「倍率」時，時薪基數空白就用「本薪 ÷ 240」；選「固定時薪」時每小時加班費＝固定加班時薪。國定假日日加給空白就用「本薪 ÷ 30」。到職日、離職日格式 2026-01-31，月中進出會按日計薪。</p>
+        <div class="scroll"><table class="cfg"><thead><tr><th>姓名</th><th>本薪</th><th>全勤</th><th>伙食費<br>每日</th><th>伙食費<br>每月</th><th>工作獎金</th><th>租金</th><th>健保</th><th>勞保</th><th>自提</th><th>加班方式</th><th>時薪基數</th><th>固定<br>加班時薪</th><th>國定假日<br>日加給</th><th>到職日</th><th>離職日</th><th>備註</th></tr></thead><tbody id="c-body"></tbody></table></div>
+        <p></p><div class="row"><button class="btn" onclick="cfgSave()">儲存薪資設定</button></div>
+      </details>
+
+      <details class="card">
+        <summary>計算規則</summary>
+        <p class="mute" style="margin:8px 0">倍率可以填分數（例如 4/3），比小數更精確。勞動部提醒：1.33、1.66 這類捨去小數的倍率會少算，可能違法。</p>
+        <div id="r-form"></div>
+        <h2 style="margin-top:16px">假別規則</h2>
+        <p class="mute" style="margin:0 0 8px">扣薪比例：1＝全扣、0.5＝扣一半、0＝不扣（以「本薪 ÷ 240」為時薪）。全勤扣法：按比例＝全勤 ÷ 30 × 請假天數；扣一半＝當月有請就扣一半。假別名稱要和「設定 → 假別」一致。</p>
+        <div class="scroll"><table class="cfg"><thead><tr><th>假別</th><th>扣薪比例</th><th>全勤扣法</th><th>說明</th><th></th></tr></thead><tbody id="l-body"></tbody></table></div>
+        <p></p><div class="row"><button class="btn sm ghost" onclick="lrAdd()">新增假別</button><button class="btn" onclick="ruleSave()">儲存計算規則</button></div>
+      </details>
+    </section>
+
     <section class="page" id="p-set" style="display:none">
       <div class="card"><h2>基本設定</h2><div id="s-form"></div>
         <p></p><div class="row"><button class="btn sm ghost" onclick="useHere()">使用目前位置作為公司座標</button></div></div>
@@ -156,7 +226,7 @@ tr.over td { background: #fff3f3; }
 <script src="config.js"></script>
 <script src="common.js"></script>
 <script>
-let report = null, depts = [];
+let report = null, depts = [], myLeaveTypes = [], myCompany = '';
 async function start() {
   try {
     if (!(await login())) return;
@@ -165,6 +235,8 @@ async function start() {
     const isAdmin = me.role === '管理員';
     if (!me.registered || me.status !== '在職' || (!isAdmin && me.role !== '資料使用者')) { $('msg').textContent = '此頁面僅限管理員與資料使用者使用。'; return; }
     document.querySelectorAll('[data-admin]').forEach((el) => { el.style.display = isAdmin ? '' : 'none'; });
+    document.querySelectorAll('[data-payroll]').forEach((el) => { el.style.display = me.payroll ? '' : 'none'; });
+    myLeaveTypes = me.leaveTypes || []; myCompany = me.company || '';
     $('who').textContent = me.name + '（' + me.role + '）'; depts = me.depts || [];
     $('t-date').value = me.today; $('o-date').value = me.today; $('r-month').value = me.today.slice(0, 7);
     $('v-msg').style.display = 'none'; $('v-main').style.display = 'block';
@@ -392,13 +464,13 @@ async function loadEmps() {
     const list = await api('adminEmps');
     const sel = (opts, v, id) => '<select id="' + id + '" style="min-width:90px">' + opts.map((o) => '<option value="' + esc(o) + '"' + (o === v ? ' selected' : '') + '>' + (esc(o) || '（未填）') + '</option>').join('') + '</select>';
     $('e-body').innerHTML = list.map((e, i) => '<tr data-uid="' + esc(e.userId) + '"><td><input id="en-' + i + '" value="' + esc(e.name) + '" style="min-width:90px"></td><td>' + sel(depts.indexOf(e.dept) >= 0 ? depts : [e.dept].concat(depts), e.dept, 'ed-' + i) + '</td><td>' +
-      sel(['員工', '資料使用者', '管理員'], e.role, 'er-' + i) + '</td><td>' + sel(['在職', '待審核', '停用'], e.status, 'es-' + i) + '</td><td style="text-align:center"><input type="checkbox" id="ex-' + i + '"' + (e.exempt ? ' checked' : '') + ' style="width:20px;height:20px;accent-color:var(--g)"></td><td><button class="btn sm" onclick="saveEmp(' + i + ',this)">儲存</button></td></tr>').join('') ||
-      '<tr><td colspan="6" class="mute">尚無員工</td></tr>';
+      sel(['員工', '資料使用者', '管理員'], e.role, 'er-' + i) + '</td><td>' + sel(['在職', '待審核', '停用'], e.status, 'es-' + i) + '</td><td style="text-align:center"><input type="checkbox" id="ex-' + i + '"' + (e.exempt ? ' checked' : '') + ' style="width:20px;height:20px;accent-color:var(--g)"></td><td style="text-align:center"><input type="checkbox" id="pp-' + i + '"' + (e.payroll ? ' checked' : '') + ' style="width:20px;height:20px;accent-color:var(--g)"></td><td><button class="btn sm" onclick="saveEmp(' + i + ',this)">儲存</button></td></tr>').join('') ||
+      '<tr><td colspan="7" class="mute">尚無員工</td></tr>';
   } catch (e) { toast(e.message, true); }
 }
 async function saveEmp(i, btn) {
   try {
-    await api('saveEmp', { userId: btn.closest('tr').dataset.uid, name: $('en-' + i).value, dept: $('ed-' + i).value, role: $('er-' + i).value, status: $('es-' + i).value, exempt: $('ex-' + i).checked });
+    await api('saveEmp', { userId: btn.closest('tr').dataset.uid, name: $('en-' + i).value, dept: $('ed-' + i).value, role: $('er-' + i).value, status: $('es-' + i).value, exempt: $('ex-' + i).checked, payroll: $('pp-' + i).checked });
     toast('已儲存'); loadEmps();
   } catch (e) { toast(e.message, true); }
 }
@@ -500,6 +572,186 @@ async function saveNotify() {
   const changes = {};
   ch.forEach((e) => { changes[e.userId] = e.off; });
   try { const r = await api('notifySave', { changes: changes }); toast('已儲存 ' + r.saved + ' 人的通知設定'); loadNotify(); } catch (e) { toast(e.message, true); }
+}
+
+/* ---------- 代員工登記請假 ---------- */
+const al = { emps: [], sel: new Set() };
+async function alOpen() {
+  try {
+    if (!al.emps.length) al.emps = (await api('adminEmps')).filter((e) => e.status === '在職');
+    $('al-sub').innerHTML = myLeaveTypes.map((t) => '<option>' + esc(t) + '</option>').join('');
+    alRender();
+  } catch (e) { toast(e.message, true); }
+}
+function alRender() {
+  $('al-emps').innerHTML = al.emps.map((e) => '<span class="chip' + (al.sel.has(e.userId) ? ' on' : '') + '" data-uid="' + esc(e.userId) + '" onclick="alToggle(this)">' + esc(e.name) + '<small>' + esc(e.dept) + '</small></span>').join('');
+}
+function alToggle(el) { const id = el.dataset.uid; if (al.sel.has(id)) al.sel.delete(id); else al.sel.add(id); el.classList.toggle('on'); }
+function alAll(on) { al.sel.clear(); if (on) al.emps.forEach((e) => al.sel.add(e.userId)); alRender(); }
+async function alSubmit() {
+  try {
+    const r = await api('adminLeave', { userIds: Array.from(al.sel), sub: $('al-sub').value, start: $('al-start').value, end: $('al-end').value, hours: $('al-hours').value, reason: $('al-reason').value });
+    toast('已登記 ' + r.added + ' 人' + (r.skipped.length ? '，略過 ' + r.skipped.length + ' 人' : ''));
+    if (r.skipped.length) alert('以下員工這段時間已有請假，未重複登記：\n' + r.skipped.join('\n'));
+    al.sel.clear(); alRender(); loadApps();
+  } catch (e) { toast(e.message, true); }
+}
+
+/* ---------- 薪資 ---------- */
+const pay = { data: null, cfg: null, sel: -1 };
+const money = (n) => (n ? Number(n).toLocaleString('en-US') : '-');
+const PAY_COLS = ['salary', 'attendance', 'overtime', 'meal', 'bonus', 'rent', 'plus', 'gross', 'health', 'labor', 'pension', 'leave', 'minus', 'net'];
+const CFG_KEYS = ['本薪', '全勤', '伙食費每日', '伙食費每月', '工作獎金', '租金', '健保', '勞保', '自提', '加班方式', '時薪基數', '固定加班時薪', '國定假日日加給', '到職日', '離職日', '備註'];
+function prevMonth() { const d = new Date(Date.now() + 8 * 3600000); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - 1); return d.toISOString().slice(0, 7); }
+async function payOpen() {
+  if (!$('p-month').value) $('p-month').value = prevMonth();
+  await Promise.all([payLoad(), cfgLoad()]);
+}
+async function payLoad() {
+  try {
+    pay.data = await api('payGet', { month: $('p-month').value });
+    pay.sel = -1; $('p-detail').style.display = 'none';
+    payRender();
+  } catch (e) { toast(e.message, true); }
+}
+function payRender() {
+  const d = pay.data, rows = d.rows, tot = {};
+  PAY_COLS.forEach((k) => { tot[k] = rows.reduce((s, r) => s + (r.items[k] || 0), 0); });
+  $('p-body').innerHTML = rows.map((r, i) => '<tr class="' + (i === pay.sel ? 'sel' : '') + '" onclick="payDetail(' + i + ')"><td><b>' + esc(r.name) + '</b>' + (r.warn.length ? ' <span class="tag bad">' + r.warn.length + '</span>' : '') + '</td>' +
+    PAY_COLS.map((k) => '<td class="' + (k === 'net' ? 'net' : '') + '">' + money(r.items[k]) + '</td>').join('') + '</tr>').join('') +
+    '<tr class="tot"><td>合計（' + rows.length + ' 人）</td>' + PAY_COLS.map((k) => '<td>' + money(tot[k]) + '</td>').join('') + '</tr>';
+  $('p-status').textContent = d.locked ? '✔ ' + d.month + ' 的薪資已於 ' + d.lockedAt + ' 由 ' + d.lockedBy + ' 確認，數字已鎖定，之後修改設定不會影響。' : d.month + ' 試算中：數字會隨出勤與設定即時變動。核對無誤後請按「確認本月薪資」鎖定。';
+  $('p-lockbtn').textContent = d.locked ? '解除確認' : '確認本月薪資';
+  $('p-lockbtn').className = 'btn sm' + (d.locked ? ' ghost' : '');
+  const ws = [];
+  rows.forEach((r) => r.warn.forEach((w) => ws.push(r.name + '：' + w)));
+  $('p-warn').innerHTML = ws.length ? '<div class="banner warn"><b>請確認以下 ' + ws.length + ' 項</b><br>' + ws.map(esc).join('<br>') + '</div>' : '';
+}
+function payDetail(i) {
+  pay.sel = i; payRender();
+  const r = pay.data.rows[i], it = r.items, dt = r.detail, h = dt.otHours, a = r.adj, lk = pay.data.locked;
+  const line = (k, v, note) => '<span>' + k + '</span><span>' + (note || '') + '</span><b>' + v + '</b>';
+  const otParts = [];
+  if (h.wk1 || h.wk2) otParts.push('平日 前2h ' + h.wk1 + '、第3h起 ' + h.wk2);
+  if (h.rs1 || h.rs2 || h.rs3) otParts.push('休息日 前2h ' + h.rs1 + '、3–8h ' + h.rs2 + '、9h起 ' + h.rs3);
+  if (h.holDays) otParts.push('國定假日 ' + h.holDays + ' 天（超過 8h：' + h.holOver + 'h）');
+  if (dt.subsidyHours) otParts.push('補貼 ' + dt.subsidyHours + 'h');
+  const lv = dt.leaves.map((x) => x.type + ' ' + x.hours + 'h（扣薪 ' + x.pay + '、全勤' + x.att + '）').join('；');
+  $('p-detail').style.display = 'block';
+  $('p-detail').innerHTML = '<h2>' + esc(r.name) + '　' + esc(pay.data.month) + ' 計算明細</h2>' +
+    (r.warn.length ? '<div class="banner warn">' + r.warn.map(esc).join('<br>') + '</div>' : '') +
+    '<div class="kv">' +
+    line('本薪', money(it.salary), dt.empDays < dt.monthDays ? '在職 ' + dt.empDays + '/' + dt.monthDays + ' 天，按日計算' : '') +
+    line('全勤', money(it.attendance), dt.attDeduct ? '全勤 ' + money(dt.attBase) + ' − 扣 ' + money(dt.attDeduct) : '') +
+    line('加班費', money(it.overtime), esc(dt.otMode) + (dt.otMode === '倍率' ? '，時薪 ' + dt.hourly : '') + (otParts.length ? '｜' + esc(otParts.join('；')) : '')) +
+    line('伙食費', money(it.meal), dt.mealDaily ? dt.mealDaily + ' × 出勤 ' + dt.mealDays + ' 天' : '') +
+    line('工作獎金', money(it.bonus)) + line('租金', money(it.rent)) + line('其他加項', money(it.plus), esc(a.plusNote)) +
+    line('<b>應領合計</b>', money(it.gross)) +
+    line('健保', money(it.health)) + line('勞保', money(it.labor)) + line('自提', money(it.pension)) +
+    line('請假', money(it.leave), esc(lv) + (lv ? '，時薪 ' + dt.legalHourly : '')) + line('其他減項', money(it.minus), esc(a.minusNote)) +
+    line('<b>應扣合計</b>', money(it.deduct)) + line('<b>實領金額</b>', '<span style="color:var(--gd)">' + money(it.net) + '</span>') +
+    '</div>' + (dt.late ? '<p class="mute">本月遲到 ' + dt.late + ' 次（系統不自動扣款，需要時請用其他減項）。</p>' : '') +
+    (lk ? '<p class="mute">本月已確認，如需修改請先「解除確認」。</p>' :
+    '<h2 style="margin-top:14px">本月調整</h2>' +
+    '<div class="row"><div><label>補貼加班時數（例如機台故障）</label><input type="number" step="0.5" id="pa-sub" value="' + esc(a.subH) + '"></div></div>' +
+    '<div class="row"><div><label>其他加項（元）</label><input type="number" id="pa-plus" value="' + esc(a.plus) + '"></div><div><label>加項說明</label><input id="pa-pn" value="' + esc(a.plusNote) + '" placeholder="例如：補發 7–9 月"></div></div>' +
+    '<div class="row"><div><label>其他減項（元）</label><input type="number" id="pa-minus" value="' + esc(a.minus) + '"></div><div><label>減項說明</label><input id="pa-mn" value="' + esc(a.minusNote) + '"></div></div>' +
+    '<label>備註（會印在薪資表備註欄）</label><input id="pa-note" value="' + esc(a.note) + '">' +
+    '<p></p><div class="row"><button class="btn" onclick="paySaveAdj()">儲存本月調整</button></div>');
+  $('p-detail').scrollIntoView({ behavior: 'smooth' });
+}
+async function paySaveAdj() {
+  const r = pay.data.rows[pay.sel];
+  try {
+    await api('paySaveAdj', { month: pay.data.month, userId: r.userId, values: { '補貼加班時數': $('pa-sub').value, '其他加項': $('pa-plus').value, '加項說明': $('pa-pn').value, '其他減項': $('pa-minus').value, '減項說明': $('pa-mn').value, '備註': $('pa-note').value } });
+    toast('已儲存，重新計算'); const keep = pay.sel; await payLoad(); payDetail(keep);
+  } catch (e) { toast(e.message, true); }
+}
+async function payToggleLock() {
+  const d = pay.data;
+  try {
+    if (d.locked) {
+      if (!confirm('確定要解除 ' + d.month + ' 的確認嗎？解除後數字會依目前的出勤與設定重新計算。')) return;
+      await api('payUnlock', { month: d.month }); toast('已解除確認');
+    } else {
+      const w = d.rows.reduce((n, r) => n + r.warn.length, 0);
+      if (!confirm('確認 ' + d.month + ' 的薪資？確認後數字會鎖定保存。' + (w ? '\n\n目前還有 ' + w + ' 項提醒未處理。' : ''))) return;
+      await api('payLock', { month: d.month }); toast('已確認並鎖定');
+    }
+    payLoad();
+  } catch (e) { toast(e.message, true); }
+}
+function rocMonth(m) { return (Number(m.slice(0, 4)) - 1911) + '年' + Number(m.slice(5)) + '月'; }
+function payPrint() {
+  const d = pay.data; if (!d) return;
+  const rows = d.rows, tot = {};
+  PAY_COLS.forEach((k) => { tot[k] = rows.reduce((s, r) => s + (r.items[k] || 0), 0); });
+  const now = new Date(Date.now() + 8 * 3600000), td = (now.getUTCFullYear() - 1911) + '.' + String(now.getUTCMonth() + 1).padStart(2, '0') + '.' + String(now.getUTCDate()).padStart(2, '0');
+  const cell = (v) => '<td class="n">' + money(v) + '</td>';
+  const remark = (r) => esc(r.notes.concat(r.warn.map((w) => '⚠ ' + w)).join('；'));
+  const html = '<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="utf-8"><title>' + esc(myCompany) + '薪資表 ' + rocMonth(d.month) + '</title><style>' +
+    '@page{size:A4 landscape;margin:12mm}body{font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;color:#111;font-size:11pt}' +
+    'h1{text-align:center;font-size:17pt;letter-spacing:6px;margin:0}.sub{text-align:center;margin:4px 0 2px}.date{text-align:right;font-size:10pt;margin-bottom:4px}' +
+    'table{width:100%;border-collapse:collapse}th,td{border:1px solid #333;padding:5px 6px;font-size:10pt}th{font-weight:600;background:#f2f2f2}td.n{text-align:right;font-variant-numeric:tabular-nums}' +
+    'td.r{font-size:8.5pt;max-width:180px}tr.t td{font-weight:700}.sign{display:flex;justify-content:flex-end;gap:120px;margin-top:18px;padding-right:60px}.st{font-size:9.5pt;color:#555;margin-top:6px}</style></head><body>' +
+    '<h1>' + esc(myCompany) + '薪資表</h1><div class="sub">' + rocMonth(d.month) + '</div><div class="date">' + td + '</div>' +
+    '<table><thead><tr><th rowspan="2">姓名</th><th colspan="7">應領金額</th><th rowspan="2">合計</th><th colspan="5">應扣金額</th><th rowspan="2">實領金額</th><th rowspan="2">備註</th></tr>' +
+    '<tr><th>本薪</th><th>全勤</th><th>加班費</th><th>伙食費</th><th>工作獎金</th><th>租金</th><th>其他加項</th><th>健保</th><th>勞保</th><th>自提</th><th>請假</th><th>其他減項</th></tr></thead><tbody>' +
+    rows.map((r) => '<tr><td>' + esc(r.name) + '</td>' + PAY_COLS.map((k) => cell(r.items[k])).join('') + '<td class="r">' + remark(r) + '</td></tr>').join('') +
+    '<tr class="t"><td>合計</td>' + PAY_COLS.map((k) => cell(tot[k])).join('') + '<td></td></tr></tbody></table>' +
+    '<div class="sign"><span>覆核：</span><span>製表：</span></div>' +
+    '<div class="st">' + (d.locked ? '本表已於 ' + esc(d.lockedAt) + ' 確認。' : '本表為試算結果，尚未確認。') + '</div>' +
+    '<script>window.onload=function(){window.print()}<\/script></body></html>';
+  const w = window.open('', '_blank');
+  if (!w) { toast('瀏覽器擋下了新視窗，請允許彈出視窗後再試', true); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+}
+function payCsv() {
+  const d = pay.data; if (!d) return;
+  const q = (v) => { let x = String(v === null || v === undefined ? '' : v); if (/^[=+\-@\t\r]/.test(x) && isNaN(Number(x))) x = "'" + x; return '"' + x.replace(/"/g, '""') + '"'; };
+  const head = ['姓名', '部門', '本薪', '全勤', '加班費', '伙食費', '工作獎金', '租金', '其他加項', '應領合計', '健保', '勞保', '自提', '請假', '其他減項', '應扣合計', '實領金額',
+    '平日加班前2h', '平日加班第3h起', '休息日前2h', '休息日3-8h', '休息日9h起', '國定假日天數', '國定假日超過8h', '補貼加班h', '出勤天數', '請假明細', '備註', '提醒'];
+  const rows = [head].concat(d.rows.map((r) => { const it = r.items, h = r.detail.otHours; return [r.name, r.dept, it.salary, it.attendance, it.overtime, it.meal, it.bonus, it.rent, it.plus, it.gross, it.health, it.labor, it.pension, it.leave, it.minus, it.deduct, it.net,
+    h.wk1, h.wk2, h.rs1, h.rs2, h.rs3, h.holDays, h.holOver, r.detail.subsidyHours, r.detail.mealDays, r.detail.leaves.map((x) => x.type + x.hours + 'h').join(' '), r.notes.join('；'), r.warn.join('；')]; }));
+  const csv = '﻿' + rows.map((r) => r.map(q).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = '薪資表_' + d.month + (d.locked ? '' : '_試算') + '.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+}
+async function cfgLoad() {
+  try {
+    pay.cfg = await api('payConfig', {}, true);
+    const c = pay.cfg;
+    $('c-body').innerHTML = c.employees.map((e, i) => '<tr data-uid="' + esc(e.userId) + '"><td><b>' + esc(e.name) + '</b>' + (e.status === '停用' ? ' <span class="tag">停用</span>' : '') + '</td>' +
+      CFG_KEYS.map((k) => '<td>' + (k === '加班方式'
+        ? '<select id="cf-' + i + '-' + k + '"><option value="倍率"' + (e[k] !== '固定時薪' ? ' selected' : '') + '>倍率</option><option value="固定時薪"' + (e[k] === '固定時薪' ? ' selected' : '') + '>固定時薪</option></select>'
+        : '<input id="cf-' + i + '-' + k + '" value="' + esc(e[k]) + '"' + (k === '到職日' || k === '離職日' ? ' placeholder="2026-01-31" style="min-width:110px"' : k === '備註' ? ' style="min-width:140px"' : ' inputmode="decimal"') + '>') + '</td>').join('') + '</tr>').join('') ||
+      '<tr><td class="mute">尚無員工</td></tr>';
+    $('r-form').innerHTML = c.rules.map((r, i) => '<div><label><b>' + esc(r.key) + '</b><br><span class="mute" style="font-size:12.5px">' + esc(r.hint) + '</span></label>' +
+      (r.key === '週日出勤比照' ? '<select id="rv-' + i + '"><option' + (r.value !== '休息日' ? ' selected' : '') + '>國定假日</option><option' + (r.value === '休息日' ? ' selected' : '') + '>休息日</option></select>' : '<input id="rv-' + i + '" value="' + esc(r.value) + '">') + '</div>').join('');
+    lrRender(c.leaveRules);
+  } catch (e) { toast(e.message, true); }
+}
+function lrRender(list) {
+  const opts = pay.cfg.attOptions;
+  $('l-body').innerHTML = list.map((r, i) => '<tr><td><input id="lt-' + i + '" value="' + esc(r.type) + '" style="min-width:100px"></td><td><input id="lp-' + i + '" value="' + esc(r.pay) + '" inputmode="decimal"></td><td><select id="la-' + i + '">' +
+    opts.map((o) => '<option' + (o === r.att ? ' selected' : '') + '>' + o + '</option>').join('') + '</select></td><td><input id="ln-' + i + '" value="' + esc(r.note) + '" style="min-width:200px"></td><td><button class="btn sm ghost" onclick="lrDel(' + i + ')">刪除</button></td></tr>').join('');
+  const miss = pay.cfg.leaveTypes.filter((t) => !list.some((r) => r.type === t));
+  if (miss.length) $('l-body').innerHTML += '<tr><td colspan="5" class="mute">提醒：假別「' + esc(miss.join('、')) + '」還沒有規則，計算時會當作不扣薪、不扣全勤。</td></tr>';
+}
+function lrRead() { const out = []; for (let i = 0; $('lt-' + i); i++) out.push({ type: $('lt-' + i).value, pay: $('lp-' + i).value, att: $('la-' + i).value, note: $('ln-' + i).value }); return out; }
+function lrAdd() { const l = lrRead(); l.push({ type: '', pay: '0', att: '不扣', note: '' }); lrRender(l); }
+function lrDel(i) { const l = lrRead(); l.splice(i, 1); lrRender(l); }
+async function cfgSave() {
+  const settings = {};
+  document.querySelectorAll('#c-body tr[data-uid]').forEach((tr, i) => { const v = {}; CFG_KEYS.forEach((k) => { v[k] = $('cf-' + i + '-' + k).value; }); settings[tr.dataset.uid] = v; });
+  try { await api('paySaveConfig', { settings: settings }); toast('薪資設定已儲存'); await cfgLoad(); payLoad(); } catch (e) { toast(e.message, true); }
+}
+async function ruleSave() {
+  const rules = {};
+  pay.cfg.rules.forEach((r, i) => { rules[r.key] = $('rv-' + i).value; });
+  try { await api('paySaveConfig', { rules: rules, leaveRules: lrRead() }); toast('計算規則已儲存'); await cfgLoad(); payLoad(); } catch (e) { toast(e.message, true); }
 }
 
 let setKeys = [];

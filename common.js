@@ -27,7 +27,7 @@ function relogin() {
 }
 
 // 只讀取資料的操作，網路斷線時可以安全地自動重試（寫入的操作不自動重試，避免重複送出）
-const READ_ONLY = ['me', 'myMonth', 'myApps', 'adminToday', 'lineStatus', 'adminApps', 'otDay', 'otMonth', 'notifyGet', 'adminEmps', 'adminReport', 'getSettings'];
+const READ_ONLY = ['me', 'myMonth', 'myApps', 'adminToday', 'lineStatus', 'adminApps', 'otDay', 'otMonth', 'notifyGet', 'adminEmps', 'adminReport', 'getSettings', 'payGet', 'payConfig'];
 // 呼叫後端。系統忙碌（多人同時操作）時會自動等一下再重試，最多 3 次
 async function api(action, data, quiet) {
   if (!quiet) busy(true);
